@@ -1559,6 +1559,8 @@
 
       if (!selected) {
         elements.playbackStatus.innerHTML = `先连接项目里的 <code>runs</code> 目录。页面会扫描每个 run 下的 <code>best_model.pt</code> 和 <code>checkpoint_*.pt</code>。`;
+      } else if (!state.playback.runsHandle && state.playback.runsSnapshotFiles.length) {
+        elements.playbackStatus.innerHTML = `当前 run: <code>${escapeHtml(selected.name)}</code>。你现在是目录快照模式；如果训练过程中新增了 checkpoint，需要重新选择 <code>runs</code> 目录。`;
       } else {
         elements.playbackStatus.innerHTML = `当前 run: <code>${escapeHtml(selected.name)}</code>。默认优先使用 <code>best_model.pt</code>，也可以切到任意 checkpoint。`;
       }
@@ -1745,6 +1747,9 @@
       elements.refreshBtn.addEventListener("click", () => refreshNow(true));
       elements.fileInput.addEventListener("change", onSnapshotSelected);
       elements.pickRunsDirBtn.addEventListener("click", pickRunsDirectory);
+      elements.refreshRunsBtn.addEventListener("click", () => {
+        refreshRunsList();
+      });
       elements.runsDirInput.addEventListener("change", onRunsDirectorySnapshotSelected);
 
       elements.autoRefresh.addEventListener("change", (event) => {
