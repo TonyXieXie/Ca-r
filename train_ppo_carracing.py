@@ -24,7 +24,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--total-timesteps", type=int, default=1_000_000)
     parser.add_argument("--num-envs", type=int, default=4)
     parser.add_argument("--num-steps", type=int, default=128)
-    parser.add_argument("--num-frames", type=int, default=4)
+    parser.add_argument("--num-frames", type=int, default=1)
+    parser.add_argument("--image-size", type=int, default=256)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--gamma", type=float, default=0.99)
@@ -48,6 +49,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--capture-video", action="store_true")
     parser.add_argument("--compile", action="store_true", help="Use torch.compile if available.")
     parser.add_argument("--fail-on-nonfinite", action="store_true", help="Abort training if NaN/Inf appears.")
+    parser.add_argument(
+        "--init-from",
+        type=Path,
+        default=None,
+        help="Initialize policy weights from a saved checkpoint without resuming optimizer state.",
+    )
     return parser.parse_args()
 
 
@@ -198,6 +205,7 @@ def evaluate_policy(
         "eval_return_mean": float(np.mean(returns)),
         "eval_return_std": float(np.std(returns)),
         "eval_length_mean": float(np.mean(lengths)),
+        "eval_steps_total": int(sum(lengths)),
     }
 
 
@@ -228,7 +236,10 @@ def main() -> None:
     obs, _ = envs.reset(seed=args.seed)
     stacked_obs = init_frame_stack(obs, args.num_frames)
 
-    policy = CarRacingPPOPolicy(num_frames=args.num_frames, image_size=96).to(device)
+    policy = CarRacingPPOPolicy(num_frames=args.num_frames, image_size=args.image_size).to(device)
+    if args.init_from is not None:
+        checkpoint = torch.load(args.init_from, map_location=device, weights_only=False)
+        policy.load_state_dict(checkpoint["model"])
     if args.compile and hasattr(torch, "compile"):
         policy = torch.compile(policy)  # type: ignore[assignment]
     optimizer = Adam(policy.parameters(), lr=args.learning_rate, eps=1e-5)
@@ -243,7 +254,7 @@ def main() -> None:
     initial_lr = args.learning_rate
 
     obs_buffer = np.zeros(
-        (args.num_steps, args.num_envs, args.num_frames, 96, 96, 3),
+        (args.num_steps, args.num_envs, args.num_frames, args.image_size, args.image_size, 3),
         dtype=np.uint8,
     )
     action_buffer = np.zeros((args.num_steps, args.num_envs, 3), dtype=np.float32)
@@ -258,10 +269,11 @@ def main() -> None:
     recent_lengths: deque[int] = deque(maxlen=20)
 
     global_step = 0
-    start_time = time.time()
+    start_time = time.perf_counter()
     best_eval_return = float("-inf")
 
     for update in range(1, num_updates + 1):
+        update_start_time = time.perf_counter()
         actor_losses: list[float] = []
         value_losses: list[float] = []
         entropy_values: list[float] = []
@@ -269,6 +281,12 @@ def main() -> None:
         approx_kls: list[float] = []
         grad_norms: list[float] = []
         finite_ok = True
+        eval_time_sec = 0.0
+        eval_steps_total = 0
+        best_checkpoint_time_sec = 0.0
+        periodic_checkpoint_time_sec = 0.0
+        save_time_sec = 0.0
+        periodic_checkpoint_path: Path | None = None
 
         # Linear learning rate annealing
         if args.lr_anneal:
@@ -277,6 +295,7 @@ def main() -> None:
             for param_group in optimizer.param_groups:
                 param_group["lr"] = lr_now
 
+        rollout_start_time = time.perf_counter()
         for step in range(args.num_steps):
             global_step += args.num_envs
             obs_buffer[step] = stacked_obs
@@ -308,7 +327,9 @@ def main() -> None:
                 episode_lengths[idx] = 0
 
             stacked_obs = update_frame_stack(stacked_obs, next_obs, done)
+        rollout_time_sec = time.perf_counter() - rollout_start_time
 
+        postprocess_start_time = time.perf_counter()
         with torch.no_grad():
             next_obs_tensor = torch.from_numpy(stacked_obs).to(device)
             next_value = policy.value(next_obs_tensor).cpu().numpy()
@@ -329,16 +350,20 @@ def main() -> None:
 
         returns = advantages + value_buffer
 
-        b_obs = torch.from_numpy(obs_buffer.reshape(batch_size, args.num_frames, 96, 96, 3)).to(device)
+        b_obs = torch.from_numpy(
+            obs_buffer.reshape(batch_size, args.num_frames, args.image_size, args.image_size, 3)
+        ).to(device)
         b_actions = torch.from_numpy(action_buffer.reshape(batch_size, 3)).to(device)
         b_logprobs = torch.from_numpy(logprob_buffer.reshape(batch_size)).to(device)
         b_advantages = torch.from_numpy(advantages.reshape(batch_size)).to(device)
         b_returns = torch.from_numpy(returns.reshape(batch_size)).to(device)
         b_values = torch.from_numpy(value_buffer.reshape(batch_size)).to(device)
+        postprocess_time_sec = time.perf_counter() - postprocess_start_time
 
         batch_indices = np.arange(batch_size)
         clipfracs = []
 
+        optimize_start_time = time.perf_counter()
         for epoch in range(args.update_epochs):
             np.random.shuffle(batch_indices)
             epoch_kls = []
@@ -390,63 +415,105 @@ def main() -> None:
                 entropy_values.append(float(entropy_loss.item()))
                 total_losses.append(float(loss.item()))
                 grad_norms.append(float(grad_norm.item() if isinstance(grad_norm, Tensor) else grad_norm))
+        optimize_time_sec = time.perf_counter() - optimize_start_time
 
         y_pred = b_values.detach().cpu().numpy()
         y_true = b_returns.detach().cpu().numpy()
         ev = explained_variance(y_pred, y_true)
-        sps = int(global_step / max(time.time() - start_time, 1e-6))
+        log_data = {
+            "update": int(update),
+            "global_step": int(global_step),
+            "avg_return_20": float(np.mean(recent_returns)) if recent_returns else None,
+            "avg_ep_len_20": float(np.mean(recent_lengths)) if recent_lengths else None,
+            "explained_variance": None if np.isnan(ev) else float(ev),
+            "clipfrac": float(np.mean(clipfracs)) if clipfracs else 0.0,
+            "policy_loss": float(np.mean(actor_losses)) if actor_losses else None,
+            "value_loss": float(np.mean(value_losses)) if value_losses else None,
+            "entropy": float(np.mean(entropy_values)) if entropy_values else None,
+            "total_loss": float(np.mean(total_losses)) if total_losses else None,
+            "approx_kl": float(np.mean(approx_kls)) if approx_kls else None,
+            "grad_norm": float(np.mean(grad_norms)) if grad_norms else None,
+            "rollout_reward_mean": float(reward_buffer.mean()),
+            "rollout_reward_std": float(reward_buffer.std()),
+            "value_mean": float(value_buffer.mean()),
+            "learning_rate": float(optimizer.param_groups[0]["lr"]),
+            "finite_ok": bool(finite_ok),
+            "eval_time_sec": None,
+            "eval_steps_total": None,
+            "eval_sps": None,
+            "best_checkpoint_time_sec": None,
+            "checkpoint_time_sec": None,
+            "save_time_sec": None,
+        }
+        if args.eval_every > 0 and update % args.eval_every == 0:
+            eval_start_time = time.perf_counter()
+            eval_metrics = evaluate_policy(
+                policy=policy,
+                device=device,
+                num_frames=args.num_frames,
+                eval_episodes=args.eval_episodes,
+                seed=args.seed + 10_000 + update * 100,
+                domain_randomize=args.domain_randomize,
+            )
+            eval_time_sec = time.perf_counter() - eval_start_time
+            eval_steps_total = int(eval_metrics["eval_steps_total"])
+            log_data.update(eval_metrics)
+            log_data["eval_time_sec"] = float(eval_time_sec)
+            log_data["eval_steps_total"] = int(eval_steps_total)
+            log_data["eval_sps"] = float(eval_steps_total / max(eval_time_sec, 1e-6))
+            if eval_metrics["eval_return_mean"] > best_eval_return:
+                best_eval_return = eval_metrics["eval_return_mean"]
+                best_save_start_time = time.perf_counter()
+                best_path = save_checkpoint(
+                    args.save_dir,
+                    policy,
+                    optimizer,
+                    args,
+                    update,
+                    global_step,
+                    filename="best_model.pt",
+                    extra={"best_eval_return": best_eval_return},
+                )
+                best_checkpoint_time_sec = time.perf_counter() - best_save_start_time
+                save_time_sec += best_checkpoint_time_sec
+                log_data["best_model"] = str(best_path)
+                log_data["best_eval_return"] = float(best_eval_return)
+                log_data["best_checkpoint_time_sec"] = float(best_checkpoint_time_sec)
+
+        if update % args.save_every == 0 or update == num_updates:
+            checkpoint_save_start_time = time.perf_counter()
+            periodic_checkpoint_path = save_checkpoint(args.save_dir, policy, optimizer, args, update, global_step)
+            periodic_checkpoint_time_sec = time.perf_counter() - checkpoint_save_start_time
+            save_time_sec += periodic_checkpoint_time_sec
+
+        elapsed_time_sec = time.perf_counter() - start_time
+        update_time_sec = time.perf_counter() - update_start_time
+        steps_remaining = max(args.total_timesteps - global_step, 0)
+        overall_sps = global_step / max(elapsed_time_sec, 1e-6)
+        sps = int(overall_sps)
+        log_data.update(
+            {
+                "sps": int(sps),
+                "sps_float": float(overall_sps),
+                "elapsed_time_sec": float(elapsed_time_sec),
+                "remaining_time_sec": float(steps_remaining / max(overall_sps, 1e-6)),
+                "update_time_sec": float(update_time_sec),
+                "rollout_time_sec": float(rollout_time_sec),
+                "postprocess_time_sec": float(postprocess_time_sec),
+                "optimize_time_sec": float(optimize_time_sec),
+                "rollout_sps": float(batch_size / max(rollout_time_sec, 1e-6)),
+                "update_sps": float(batch_size / max(update_time_sec, 1e-6)),
+                "checkpoint_time_sec": float(periodic_checkpoint_time_sec) if periodic_checkpoint_path is not None else None,
+                "save_time_sec": float(save_time_sec) if save_time_sec > 0 else None,
+            }
+        )
 
         if update % args.log_every == 0:
-            log_data = {
-                "update": int(update),
-                "global_step": int(global_step),
-                "sps": int(sps),
-                "avg_return_20": float(np.mean(recent_returns)) if recent_returns else None,
-                "avg_ep_len_20": float(np.mean(recent_lengths)) if recent_lengths else None,
-                "explained_variance": None if np.isnan(ev) else float(ev),
-                "clipfrac": float(np.mean(clipfracs)) if clipfracs else 0.0,
-                "policy_loss": float(np.mean(actor_losses)) if actor_losses else None,
-                "value_loss": float(np.mean(value_losses)) if value_losses else None,
-                "entropy": float(np.mean(entropy_values)) if entropy_values else None,
-                "total_loss": float(np.mean(total_losses)) if total_losses else None,
-                "approx_kl": float(np.mean(approx_kls)) if approx_kls else None,
-                "grad_norm": float(np.mean(grad_norms)) if grad_norms else None,
-                "rollout_reward_mean": float(reward_buffer.mean()),
-                "rollout_reward_std": float(reward_buffer.std()),
-                "value_mean": float(value_buffer.mean()),
-                "learning_rate": float(optimizer.param_groups[0]["lr"]),
-                "finite_ok": bool(finite_ok),
-            }
-            if args.eval_every > 0 and update % args.eval_every == 0:
-                eval_metrics = evaluate_policy(
-                    policy=policy,
-                    device=device,
-                    num_frames=args.num_frames,
-                    eval_episodes=args.eval_episodes,
-                    seed=args.seed + 10_000 + update * 100,
-                    domain_randomize=args.domain_randomize,
-                )
-                log_data.update(eval_metrics)
-                if eval_metrics["eval_return_mean"] > best_eval_return:
-                    best_eval_return = eval_metrics["eval_return_mean"]
-                    best_path = save_checkpoint(
-                        args.save_dir,
-                        policy,
-                        optimizer,
-                        args,
-                        update,
-                        global_step,
-                        filename="best_model.pt",
-                        extra={"best_eval_return": best_eval_return},
-                    )
-                    log_data["best_model"] = str(best_path)
-                    log_data["best_eval_return"] = float(best_eval_return)
             print(json.dumps(log_data, ensure_ascii=False))
             append_jsonl(metrics_path, log_data)
 
-        if update % args.save_every == 0 or update == num_updates:
-            checkpoint_path = save_checkpoint(args.save_dir, policy, optimizer, args, update, global_step)
-            print(json.dumps({"checkpoint": str(checkpoint_path)}, ensure_ascii=False))
+        if periodic_checkpoint_path is not None:
+            print(json.dumps({"checkpoint": str(periodic_checkpoint_path)}, ensure_ascii=False))
 
     envs.close()
 

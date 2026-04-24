@@ -136,12 +136,13 @@ def main() -> None:
     checkpoint_args = checkpoint.get("args", {})
 
     num_frames = int(checkpoint_args.get("num_frames", 4))
+    image_size = int(checkpoint_args.get("image_size", 96))
     seed = int(checkpoint_args.get("seed", 7)) if args.seed is None else int(args.seed)
     domain_randomize = bool(checkpoint_args.get("domain_randomize", False))
     if args.domain_randomize is not None:
         domain_randomize = args.domain_randomize
 
-    policy = CarRacingPPOPolicy(num_frames=num_frames, image_size=96).to(device)
+    policy = CarRacingPPOPolicy(num_frames=num_frames, image_size=image_size).to(device)
     policy.load_state_dict(checkpoint["model"])
     policy.eval()
 

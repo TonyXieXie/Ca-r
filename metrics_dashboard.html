@@ -648,6 +648,124 @@
       line-height: 1.7;
     }
 
+    .combined-selector {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+        rgba(255, 255, 255, 0.015);
+    }
+
+    .combined-selector-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .combined-selector-copy {
+      color: var(--text-dim);
+      font-size: 12px;
+      line-height: 1.7;
+      max-width: 70ch;
+    }
+
+    .combined-selector-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      max-height: 220px;
+      overflow: auto;
+      padding-right: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(104, 225, 253, 0.28) transparent;
+    }
+
+    .combined-selector-grid::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .combined-selector-grid::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .combined-selector-grid::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background: linear-gradient(180deg, rgba(104, 225, 253, 0.32), rgba(69, 240, 201, 0.22));
+      background-clip: padding-box;
+    }
+
+    .combined-check {
+      display: grid;
+      gap: 6px;
+      padding: 11px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)),
+        rgba(255, 255, 255, 0.015);
+      cursor: pointer;
+      transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+      min-width: 0;
+    }
+
+    .combined-check:hover {
+      border-color: rgba(104, 225, 253, 0.22);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+        rgba(255, 255, 255, 0.02);
+      transform: translateY(-1px);
+    }
+
+    .combined-check.is-selected {
+      border-color: rgba(104, 225, 253, 0.34);
+      background:
+        linear-gradient(135deg, rgba(104, 225, 253, 0.12), rgba(69, 240, 201, 0.06)),
+        rgba(255, 255, 255, 0.03);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .combined-check-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .combined-check input[type="checkbox"] {
+      margin: 0;
+      flex: 0 0 auto;
+    }
+
+    .combined-check-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 0;
+    }
+
+    .combined-check-meta {
+      color: var(--text-faint);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .combined-check-dot {
+      flex: 0 0 auto;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      box-shadow: 0 0 16px currentColor;
+    }
+
     .combined-legend {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1133,6 +1251,7 @@
       }
 
       .summary-grid,
+      .combined-selector-grid,
       .combined-legend,
       .playback-grid,
       .chart-grid {
@@ -1166,6 +1285,7 @@
       }
 
       .summary-grid,
+      .combined-selector-grid,
       .combined-legend,
       .playback-grid,
       .chart-grid {
@@ -1312,6 +1432,19 @@
       <p class="combined-note" id="combined-note">
         组合图下方的横条就是缩放窗口。拖动两侧手柄改变观测长度，拖动中间高亮区域平移到别的时间段。
       </p>
+
+      <section class="combined-selector">
+        <div class="combined-selector-head">
+          <div class="combined-selector-copy">
+            默认组合指标已经预勾选。你也可以勾选其他数值指标加入组合观察，或者取消默认指标。
+          </div>
+          <div class="row">
+            <button class="ghost" id="combined-select-defaults-btn" type="button">恢复默认指标</button>
+            <div class="legend-chip" id="combined-selected-count">0 个已选</div>
+          </div>
+        </div>
+        <div class="combined-selector-grid" id="combined-selector-grid"></div>
+      </section>
 
       <div class="combined-legend" id="combined-legend"></div>
       <div class="combined-stage" id="combined-chart"></div>
@@ -1495,6 +1628,7 @@
     };
 
     const COMBINED_FALLBACK_COLORS = ["#68e1fd", "#ffcf71", "#45f0c9", "#aea1ff", "#ff7b71", "#b8ff6f"];
+    const COMBINED_EXCLUDED_METRICS = new Set(["update", "global_step"]);
 
     const CATEGORY_MAP = {
       avg_return_20: "training",
@@ -1516,6 +1650,21 @@
       value_mean: "optimization",
       learning_rate: "system",
       sps: "system",
+      sps_float: "system",
+      elapsed_time_sec: "system",
+      remaining_time_sec: "system",
+      update_time_sec: "system",
+      rollout_time_sec: "system",
+      postprocess_time_sec: "system",
+      optimize_time_sec: "system",
+      eval_time_sec: "system",
+      checkpoint_time_sec: "system",
+      save_time_sec: "system",
+      best_checkpoint_time_sec: "system",
+      rollout_sps: "system",
+      update_sps: "system",
+      eval_sps: "system",
+      eval_steps_total: "system",
       update: "system",
       global_step: "system",
       finite_ok: "boolean",
@@ -1605,6 +1754,9 @@
       combinedStatus: document.getElementById("combined-status"),
       combinedAxisLabel: document.getElementById("combined-axis-label"),
       combinedNote: document.getElementById("combined-note"),
+      combinedSelectDefaultsBtn: document.getElementById("combined-select-defaults-btn"),
+      combinedSelectedCount: document.getElementById("combined-selected-count"),
+      combinedSelectorGrid: document.getElementById("combined-selector-grid"),
       combinedLegend: document.getElementById("combined-legend"),
       combinedChart: document.getElementById("combined-chart"),
       combinedBrushLabel: document.getElementById("combined-brush-label"),
@@ -1922,7 +2074,7 @@
         return "optimization";
       }
       if (name.includes("return") || name.includes("reward") || name.includes("len")) return "training";
-      if (name.includes("step") || name.includes("sps") || name.includes("rate")) return "system";
+      if (name.includes("time") || name.includes("step") || name.includes("sps") || name.includes("rate")) return "system";
       return "other";
     }
 
@@ -2060,6 +2212,27 @@
         if (keyword && !metric.name.toLowerCase().includes(keyword)) return false;
         return true;
       });
+    }
+
+    function combinedSelectableMetrics(rows) {
+      return collectMetrics(rows).filter((metric) => (
+        metric.type === "number" &&
+        !COMBINED_EXCLUDED_METRICS.has(metric.name)
+      ));
+    }
+
+    function sanitizeCombinedMetricSelection(rows) {
+      const available = combinedSelectableMetrics(rows).map((metric) => metric.name);
+      if (!available.length) {
+        return available;
+      }
+
+      const availableSet = new Set(available);
+      const preserved = state.combined.metrics.filter((name, index, arr) => (
+        availableSet.has(name) && arr.indexOf(name) === index
+      ));
+      state.combined.metrics = preserved;
+      return available;
     }
 
     function svgChart(metric) {
@@ -2428,21 +2601,67 @@
     }
 
     function renderCombined(rows) {
+      const availableMetrics = combinedSelectableMetrics(rows);
+      const availableNames = sanitizeCombinedMetricSelection(rows);
       const combined = buildCombinedSeries(rows);
       elements.combinedAxisLabel.textContent = `x-axis: ${xAxisDisplayLabel()}`;
+      elements.combinedSelectedCount.textContent = `${formatInteger(state.combined.metrics.length)} 个已选`;
+
+      if (!availableMetrics.length) {
+        elements.combinedSelectorGrid.innerHTML = `
+          <div class="combined-check">
+            <div class="combined-check-meta">当前还没有可用于组合观察的数值型指标。</div>
+          </div>
+        `;
+      } else {
+        const selectedSet = new Set(state.combined.metrics);
+        elements.combinedSelectorGrid.innerHTML = availableMetrics.map((metric, index) => {
+          const color = combinedMetricColor(metric.name, index);
+          const checked = selectedSet.has(metric.name);
+          return `
+            <label class="combined-check${checked ? " is-selected" : ""}">
+              <div class="combined-check-main">
+                <input type="checkbox" data-combined-metric="${escapeHtml(metric.name)}" ${checked ? "checked" : ""} />
+                <span class="combined-check-dot" style="color: ${color}; background: ${color};"></span>
+                <span class="combined-check-name">${escapeHtml(metric.name)}</span>
+              </div>
+              <div class="combined-check-meta">
+                latest ${escapeHtml(formatNumber(metric.last?.y ?? metric.last?.raw ?? metric.last))} · ${escapeHtml(CATEGORY_STYLE[metric.category]?.label || "其他指标")}
+              </div>
+            </label>
+          `;
+        }).join("");
+
+        elements.combinedSelectorGrid.querySelectorAll("input[data-combined-metric]").forEach((input) => {
+          input.addEventListener("change", (event) => {
+            const metricName = event.target.dataset.combinedMetric;
+            if (!metricName) return;
+
+            if (event.target.checked) {
+              if (!state.combined.metrics.includes(metricName)) {
+                state.combined.metrics = [...state.combined.metrics, metricName];
+              }
+            } else {
+              state.combined.metrics = state.combined.metrics.filter((name) => name !== metricName);
+            }
+
+            render();
+          });
+        });
+      }
 
       if (!rows.length || !combined.series.length) {
-        elements.combinedStatus.textContent = "等待数据";
-        elements.combinedBrushLabel.textContent = "当前窗口: 无数据";
+        elements.combinedStatus.textContent = rows.length ? "未选指标" : "等待数据";
+        elements.combinedBrushLabel.textContent = rows.length ? "当前窗口: 请先勾选指标" : "当前窗口: 无数据";
         elements.combinedLegend.innerHTML = `
           <div class="combined-legend-item">
-            <div class="combined-legend-meta">当前还没有足够的数据来绘制组合图。</div>
+            <div class="combined-legend-meta">${rows.length ? "当前没有被勾选的组合指标，或者所勾选指标在当前日志里没有有效数值。" : "当前还没有足够的数据来绘制组合图。"}</div>
           </div>
         `;
         elements.combinedChart.innerHTML = `
           <svg viewBox="0 0 1320 360" role="img" aria-label="combined metrics empty">
             <text x="50%" y="50%" fill="rgba(235,246,255,0.45)" text-anchor="middle" font-size="18">
-              no combined data
+              ${rows.length ? "select metrics to compare" : "no combined data"}
             </text>
           </svg>
         `;
@@ -2459,6 +2678,10 @@
         elements.combinedBrushShadeLeft.style.width = "0";
         elements.combinedBrushShadeRight.style.left = "100%";
         elements.combinedBrushShadeRight.style.width = "0";
+        const dedupedCount = new Set(DEFAULT_COMBINED_METRICS).size;
+        elements.combinedNote.textContent = rows.length
+          ? `当前从 ${availableNames.length} 个可选指标里勾选了 ${state.combined.metrics.length} 个。默认组合清单包含 ${dedupedCount} 个唯一指标。请勾选至少一个指标后再观察组合趋势。`
+          : "组合图下方的横条就是缩放窗口。拖动两侧手柄改变观测长度，拖动中间高亮区域平移到别的时间段。";
         return;
       }
 
@@ -2484,7 +2707,7 @@
       const dedupedCount = new Set(DEFAULT_COMBINED_METRICS).size;
       elements.combinedNote.textContent = `${
         usingFullHistory ? "当前显示全历史记录。" : `当前窗口覆盖第 ${combined.startIndex + 1} 到第 ${combined.endIndexExclusive} 条记录。`
-      } 组合图按每条线在当前窗口内单独归一化。默认组合清单包含 ${dedupedCount} 个唯一指标。${
+      } 组合图按每条线在当前窗口内单独归一化。默认组合清单包含 ${dedupedCount} 个唯一指标，当前从 ${availableNames.length} 个可选指标里勾选了 ${state.combined.metrics.length} 个。${
         missing.length ? ` 缺失字段: ${missing.join(", ")}。` : ""
       }`;
 
@@ -3016,6 +3239,12 @@
 
       elements.combinedFullHistoryBtn.addEventListener("click", () => {
         setCombinedWindow(0, 1);
+        render();
+      });
+
+      elements.combinedSelectDefaultsBtn.addEventListener("click", () => {
+        const available = new Set(combinedSelectableMetrics(state.rows).map((metric) => metric.name));
+        state.combined.metrics = [...new Set(DEFAULT_COMBINED_METRICS)].filter((name) => available.has(name));
         render();
       });
 
