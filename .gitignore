@@ -1,0 +1,27 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Training outputs and generated artifacts
+runs/
+*.pt
+*.pth
+*.ckpt
+*.mp4
+*.gif
+*.png
+*.log
+*.jsonl
+
+# Local/editor/system files
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+

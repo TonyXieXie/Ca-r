@@ -1,0 +1,6 @@
+gymnasium[box2d]==1.2.3
+numpy==2.4.4
+pygame==2.6.1
+torch==2.11.0
+matplotlib==3.10.8
+

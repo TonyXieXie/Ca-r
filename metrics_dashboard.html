@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CarRacing Metrics Dashboard</title>
+  <style>
+    :root {
+      --bg: #081119;
+      --bg-elevated: rgba(10, 24, 36, 0.76);
+      --panel: rgba(11, 29, 41, 0.88);
+      --panel-border: rgba(127, 211, 255, 0.18);
+      --panel-strong: rgba(255, 255, 255, 0.06);
+      --text: #ebf6ff;
+      --text-dim: rgba(235, 246, 255, 0.68);
+      --text-faint: rgba(235, 246, 255, 0.42);
+      --cyan: #68e1fd;
+      --teal: #45f0c9;
+      --amber: #ffcf71;
+      --red: #ff7b71;
+      --violet: #aea1ff;
+      --lime: #b8ff6f;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+      --radius-lg: 28px;
+      --radius-md: 18px;
+      --radius-sm: 12px;
+      --grid: rgba(255, 255, 255, 0.08);
+      --ok: #7dffb1;
+      --warn: #ffdc8a;
+      --bad: #ff8a8a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(69, 240, 201, 0.14), transparent 28%),
+        radial-gradient(circle at 88% 14%, rgba(104, 225, 253, 0.15), transparent 26%),
+        radial-gradient(circle at 50% 100%, rgba(174, 161, 255, 0.12), transparent 32%),
+        linear-gradient(180deg, #061018 0%, #091723 48%, #061018 100%);
+      color: var(--text);
+      font-family: "Segoe UI Variable Display", "Bahnschrift", "Segoe UI", sans-serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.28;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: radial-gradient(circle at center, black 38%, transparent 94%);
+    }
+
+    .shell {
+      width: min(1520px, calc(100vw - 32px));
+      margin: 20px auto 32px;
+      padding: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 32px;
+      background: linear-gradient(180deg, rgba(7, 21, 31, 0.85), rgba(6, 18, 28, 0.72));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.9fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .hero-card,
+    .control-card,
+    .summary-card,
+    .chart-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-lg);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0)),
+        var(--panel);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero-card::after,
+    .control-card::after,
+    .summary-card::after,
+    .chart-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, rgba(104, 225, 253, 0.08), transparent 32%),
+        linear-gradient(320deg, rgba(255, 207, 113, 0.08), transparent 28%);
+      mix-blend-mode: screen;
+    }
+
+    .hero-card {
+      padding: 24px 26px 24px;
+      min-height: 220px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(104, 225, 253, 0.08);
+      color: var(--cyan);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 18px 0 10px;
+      font-size: clamp(34px, 5vw, 64px);
+      line-height: 0.94;
+      letter-spacing: -0.04em;
+      font-weight: 700;
+      max-width: 11ch;
+    }
+
+    .subtitle {
+      max-width: 62ch;
+      margin: 0;
+      color: var(--text-dim);
+      font-size: 15px;
+      line-height: 1.75;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .meta-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 14px rgba(104, 225, 253, 0.58);
+    }
+
+    .control-card {
+      padding: 22px;
+    }
+
+    .control-title {
+      margin: 0 0 14px;
+      font-size: 14px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-weight: 600;
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--text-faint);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    button,
+    select,
+    input[type="search"],
+    input[type="number"] {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+    }
+
+    button:hover,
+    select:hover,
+    input[type="search"]:hover,
+    input[type="number"]:hover,
+    button:focus-visible,
+    select:focus-visible,
+    input[type="search"]:focus-visible,
+    input[type="number"]:focus-visible {
+      border-color: rgba(104, 225, 253, 0.42);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    button {
+      padding: 12px 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, rgba(104, 225, 253, 0.18), rgba(69, 240, 201, 0.16));
+      border-color: rgba(104, 225, 253, 0.36);
+    }
+
+    button.ghost {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    select,
+    input[type="search"],
+    input[type="number"] {
+      padding: 11px 14px;
+      min-height: 44px;
+    }
+
+    input[type="file"] {
+      max-width: 100%;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    label.inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-dim);
+      font-size: 13px;
+      user-select: none;
+    }
+
+    input[type="checkbox"] {
+      accent-color: var(--cyan);
+      width: 16px;
+      height: 16px;
+    }
+
+    .status-box {
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: grid;
+      gap: 6px;
+    }
+
+    .status-box code {
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 12px;
+      color: var(--cyan);
+      word-break: break-all;
+    }
+
+    .status-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .status-pill.ok {
+      color: var(--ok);
+    }
+
+    .status-pill.warn {
+      color: var(--warn);
+    }
+
+    .status-pill.bad {
+      color: var(--bad);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    .toolbar .row {
+      gap: 8px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .playback-grid {
+      display: grid;
+      grid-template-columns: minmax(340px, 1fr) minmax(420px, 1.15fr);
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .playback-card {
+      padding: 18px;
+      min-height: 220px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field span {
+      color: var(--text-faint);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .playback-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .playback-note {
+      margin: 12px 0 0;
+      color: var(--text-dim);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .command-box {
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.18);
+      overflow: auto;
+    }
+
+    .command-box code {
+      color: var(--cyan);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .command-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .command-hint {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    .summary-card {
+      padding: 18px 18px 16px;
+      min-height: 118px;
+    }
+
+    .summary-label {
+      color: var(--text-faint);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+
+    .summary-value {
+      margin-top: 18px;
+      font-size: clamp(22px, 2vw, 34px);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+    }
+
+    .summary-note {
+      margin-top: 8px;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 18px 0 12px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-faint);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .legend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 11px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-dim);
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      box-shadow: 0 0 14px currentColor;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .chart-card {
+      padding: 16px;
+      min-height: 250px;
+    }
+
+    .chart-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .chart-title-wrap {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .chart-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+      word-break: break-word;
+    }
+
+    .chart-category {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-faint);
+    }
+
+    .chart-latest {
+      flex: 0 0 auto;
+      text-align: right;
+    }
+
+    .chart-latest strong {
+      display: block;
+      font-size: 22px;
+      letter-spacing: -0.04em;
+    }
+
+    .chart-latest span {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    .mini-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 10px 0 14px;
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    .mini-stats span {
+      display: inline-flex;
+      gap: 6px;
+      align-items: baseline;
+    }
+
+    .mini-stats b {
+      color: var(--text);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-weight: 600;
+    }
+
+    .chart-stage {
+      height: 128px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+        rgba(0, 0, 0, 0.16);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .chart-stage svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .chart-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+      color: var(--text-faint);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .empty-state {
+      padding: 32px;
+      border-radius: var(--radius-lg);
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      text-align: center;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .empty-state h3 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    .empty-state p {
+      margin: 0 auto;
+      max-width: 56ch;
+      line-height: 1.8;
+    }
+
+    @media (max-width: 1220px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-grid,
+      .playback-grid,
+      .chart-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        width: min(100vw - 16px, 100%);
+        margin: 8px auto 18px;
+        padding: 10px;
+        border-radius: 20px;
+      }
+
+      .hero-card,
+      .control-card,
+      .summary-card,
+      .chart-card {
+        border-radius: 20px;
+      }
+
+      .hero-card {
+        padding: 18px;
+      }
+
+      .control-card,
+      .summary-card,
+      .chart-card {
+        padding: 14px;
+      }
+
+      .summary-grid,
+      .playback-grid,
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .field-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-stage {
+        height: 144px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <article class="hero-card">
+        <div class="eyebrow">Live JSONL Telemetry</div>
+        <h1>CarRacing 训练监控面板</h1>
+        <p class="subtitle">
+          选择一个 <code>metrics.jsonl</code>，页面会自动解析其中的数值型监督指标并绘制趋势。
+          如果浏览器支持文件句柄，会定时轮询文件变化，适合边训练边看。
+        </p>
+        <div class="hero-meta">
+          <div class="meta-chip"><span class="meta-dot"></span><span>适配 JSONL 追加写入</span></div>
+          <div class="meta-chip"><span class="meta-dot"></span><span>自动识别指标字段</span></div>
+          <div class="meta-chip"><span class="meta-dot"></span><span>本地单文件，无后端</span></div>
+        </div>
+      </article>
+
+      <aside class="control-card">
+        <p class="control-title">数据源</p>
+        <div class="controls">
+          <div class="row">
+            <button class="primary" id="pick-handle-btn" type="button">连接文件并自动刷新</button>
+            <button class="ghost" id="refresh-btn" type="button">立即刷新</button>
+          </div>
+
+          <div class="row">
+            <input id="file-input" type="file" accept=".jsonl,application/jsonl,text/plain,.txt" />
+          </div>
+
+          <div class="row">
+            <label class="inline">
+              <input id="auto-refresh" type="checkbox" checked />
+              自动刷新
+            </label>
+            <label class="inline">
+              刷新间隔
+              <select id="interval-select">
+                <option value="1000">1 秒</option>
+                <option value="2000" selected>2 秒</option>
+                <option value="5000">5 秒</option>
+                <option value="10000">10 秒</option>
+              </select>
+            </label>
+            <label class="inline">
+              X 轴
+              <select id="x-axis-select">
+                <option value="global_step" selected>global_step</option>
+                <option value="update">update</option>
+                <option value="index">行号</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
+            <label class="inline">
+              视图
+              <select id="preset-select">
+                <option value="core" selected>核心指标</option>
+                <option value="all">全部指标</option>
+                <option value="training">训练表现</option>
+                <option value="optimization">优化稳定性</option>
+                <option value="evaluation">评估相关</option>
+              </select>
+            </label>
+            <input id="metric-filter" type="search" placeholder="过滤指标名，例如 return / kl / loss" />
+          </div>
+
+          <p class="hint">
+            推荐用 Edge/Chrome 点击“连接文件并自动刷新”。如果浏览器不支持文件句柄，
+            仍然可以通过普通文件选择读取快照，但训练中追加写入时需要重新选择文件。
+          </p>
+
+          <div class="status-box">
+            <div class="status-line">
+              <span class="status-pill" id="mode-pill">未连接</span>
+              <span class="status-pill warn" id="refresh-pill">等待数据</span>
+              <span class="status-pill" id="rows-pill">0 行</span>
+            </div>
+            <div><code id="file-path">尚未选择文件</code></div>
+            <div class="status-line">
+              <span id="last-read-label">最后读取: -</span>
+              <span id="file-size-label">大小: -</span>
+            </div>
+            <div class="status-line">
+              <span id="warning-label">警告: -</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="toolbar">
+      <div class="row">
+        <button class="ghost" type="button" id="show-core-btn">只看核心</button>
+        <button class="ghost" type="button" id="show-all-btn">显示全部</button>
+      </div>
+      <div class="legend">
+        <span class="legend-chip"><span class="swatch" style="color: var(--cyan); background: var(--cyan);"></span>训练表现</span>
+        <span class="legend-chip"><span class="swatch" style="color: var(--amber); background: var(--amber);"></span>优化稳定性</span>
+        <span class="legend-chip"><span class="swatch" style="color: var(--teal); background: var(--teal);"></span>评估指标</span>
+        <span class="legend-chip"><span class="swatch" style="color: var(--violet); background: var(--violet);"></span>运行状态</span>
+        <span class="legend-chip"><span class="swatch" style="color: var(--lime); background: var(--lime);"></span>布尔状态</span>
+      </div>
+    </div>
+
+    <section id="summary-grid" class="summary-grid"></section>
+
+    <section class="playback-grid">
+      <article class="control-card playback-card">
+        <p class="control-title">回放控制台</p>
+        <div class="row">
+          <button class="primary" id="pick-runs-dir-btn" type="button">连接 runs 目录</button>
+          <button class="ghost" id="refresh-runs-btn" type="button">刷新 runs 列表</button>
+          <input id="runs-dir-input" type="file" webkitdirectory directory multiple />
+        </div>
+
+        <div class="field-grid">
+          <label class="field full">
+            <span>Run</span>
+            <select id="run-select">
+              <option value="">先连接 runs 目录</option>
+            </select>
+          </label>
+
+          <label class="field full">
+            <span>Checkpoint</span>
+            <select id="checkpoint-select" disabled>
+              <option value="">先选择 run</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Episodes</span>
+            <input id="playback-episodes" type="number" min="1" step="1" value="3" />
+          </label>
+
+          <label class="field">
+            <span>FPS</span>
+            <input id="playback-fps" type="number" min="1" step="1" value="50" />
+          </label>
+
+          <label class="field">
+            <span>Max Steps</span>
+            <input id="playback-max-steps" type="number" min="0" step="1" value="0" />
+          </label>
+
+          <label class="field">
+            <span>Domain Randomize</span>
+            <select id="playback-domain-randomize">
+              <option value="inherit" selected>继承 checkpoint</option>
+              <option value="on">强制开启</option>
+              <option value="off">强制关闭</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="playback-meta">
+          <label class="inline">
+            <input id="playback-cpu" type="checkbox" />
+            CPU
+          </label>
+          <label class="inline">
+            <input id="playback-no-render" type="checkbox" />
+            无窗口
+          </label>
+          <label class="inline">
+            <input id="playback-stochastic" type="checkbox" />
+            随机策略
+          </label>
+        </div>
+
+        <p class="playback-note" id="playback-status">
+          先连接项目里的 <code>runs</code> 目录。页面会扫描每个 run 下的 <code>best_model.pt</code>
+          和 <code>checkpoint_*.pt</code>，默认选择 best。
+        </p>
+      </article>
+
+      <article class="control-card playback-card">
+        <p class="control-title">回放命令</p>
+        <div class="status-box">
+          <div class="status-line">
+            <span class="status-pill" id="playback-runs-pill">0 个 run</span>
+            <span class="status-pill" id="playback-checkpoints-pill">0 个 checkpoint</span>
+          </div>
+          <div class="status-line">
+            <span id="playback-root-label">根目录: 未连接</span>
+          </div>
+        </div>
+
+        <div class="command-box">
+          <code id="playback-command">.\run_best_carracing.ps1 -RunDir '.\runs\your_run'</code>
+        </div>
+
+        <div class="command-actions">
+          <div class="row">
+            <button class="ghost" id="copy-playback-command-btn" type="button">复制命令</button>
+            <button class="ghost" id="reset-playback-btn" type="button">恢复默认</button>
+          </div>
+          <div class="command-hint">
+            在项目根目录 <code>E:\AI\Car</code> 的 PowerShell 里执行这条命令。
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section-title">
+      <h2>Metric Charts</h2>
+      <div id="metric-count" class="legend-chip">0 个指标</div>
+    </section>
+
+    <section id="empty-state" class="empty-state">
+      <h3>先载入一个 metrics.jsonl</h3>
+      <p>
+        当前页面还没有拿到训练日志。你可以直接选择
+        <code>E:\AI\Car\runs\...\metrics.jsonl</code>，
+        页面会按字段自动生成图表，并在可用时持续刷新。
+      </p>
+    </section>
+
+    <section id="chart-grid" class="chart-grid" hidden></section>
+  </main>
+
+  <script>
+    const CATEGORY_STYLE = {
+      training: { label: "训练表现", color: "#68e1fd", fill: "rgba(104, 225, 253, 0.16)" },
+      optimization: { label: "优化稳定性", color: "#ffcf71", fill: "rgba(255, 207, 113, 0.16)" },
+      evaluation: { label: "评估指标", color: "#45f0c9", fill: "rgba(69, 240, 201, 0.16)" },
+      system: { label: "运行状态", color: "#aea1ff", fill: "rgba(174, 161, 255, 0.16)" },
+      boolean: { label: "布尔状态", color: "#b8ff6f", fill: "rgba(184, 255, 111, 0.16)" },
+      other: { label: "其他指标", color: "#ff7b71", fill: "rgba(255, 123, 113, 0.16)" },
+    };
+
+    const CORE_METRICS = [
+      "avg_return_20",
+      "eval_return_mean",
+      "best_eval_return",
+      "avg_ep_len_20",
+      "explained_variance",
+      "clipfrac",
+      "approx_kl",
+      "entropy",
+      "policy_loss",
+      "value_loss",
+      "grad_norm",
+      "sps",
+      "rollout_reward_mean",
+      "learning_rate",
+    ];
+
+    const CATEGORY_MAP = {
+      avg_return_20: "training",
+      avg_ep_len_20: "training",
+      rollout_reward_mean: "training",
+      rollout_reward_std: "training",
+      best_eval_return: "evaluation",
+      eval_return_mean: "evaluation",
+      eval_return_std: "evaluation",
+      eval_length_mean: "evaluation",
+      explained_variance: "optimization",
+      clipfrac: "optimization",
+      approx_kl: "optimization",
+      entropy: "optimization",
+      policy_loss: "optimization",
+      value_loss: "optimization",
+      total_loss: "optimization",
+      grad_norm: "optimization",
+      value_mean: "optimization",
+      learning_rate: "system",
+      sps: "system",
+      update: "system",
+      global_step: "system",
+      finite_ok: "boolean",
+    };
+
+    const state = {
+      rows: [],
+      fileHandle: null,
+      snapshotFile: null,
+      fileLabel: "",
+      lastRead: null,
+      lastSize: 0,
+      lastModified: 0,
+      warnings: [],
+      autoRefresh: true,
+      intervalMs: 2000,
+      xAxis: "global_step",
+      preset: "core",
+      filter: "",
+      timer: null,
+      playback: {
+        runsHandle: null,
+        runsSnapshotFiles: [],
+        rootLabel: "",
+        runs: [],
+        selectedRun: "",
+        selectedCheckpoint: "best",
+        episodes: 3,
+        fps: 50,
+        maxSteps: 0,
+        domainRandomize: "inherit",
+        cpu: false,
+        noRender: false,
+        stochastic: false,
+      },
+    };
+
+    const elements = {
+      pickHandleBtn: document.getElementById("pick-handle-btn"),
+      refreshBtn: document.getElementById("refresh-btn"),
+      fileInput: document.getElementById("file-input"),
+      autoRefresh: document.getElementById("auto-refresh"),
+      intervalSelect: document.getElementById("interval-select"),
+      xAxisSelect: document.getElementById("x-axis-select"),
+      presetSelect: document.getElementById("preset-select"),
+      metricFilter: document.getElementById("metric-filter"),
+      modePill: document.getElementById("mode-pill"),
+      refreshPill: document.getElementById("refresh-pill"),
+      rowsPill: document.getElementById("rows-pill"),
+      filePath: document.getElementById("file-path"),
+      lastReadLabel: document.getElementById("last-read-label"),
+      fileSizeLabel: document.getElementById("file-size-label"),
+      warningLabel: document.getElementById("warning-label"),
+      summaryGrid: document.getElementById("summary-grid"),
+      chartGrid: document.getElementById("chart-grid"),
+      emptyState: document.getElementById("empty-state"),
+      metricCount: document.getElementById("metric-count"),
+      showCoreBtn: document.getElementById("show-core-btn"),
+      showAllBtn: document.getElementById("show-all-btn"),
+      pickRunsDirBtn: document.getElementById("pick-runs-dir-btn"),
+      refreshRunsBtn: document.getElementById("refresh-runs-btn"),
+      runsDirInput: document.getElementById("runs-dir-input"),
+      runSelect: document.getElementById("run-select"),
+      checkpointSelect: document.getElementById("checkpoint-select"),
+      playbackEpisodes: document.getElementById("playback-episodes"),
+      playbackFps: document.getElementById("playback-fps"),
+      playbackMaxSteps: document.getElementById("playback-max-steps"),
+      playbackDomainRandomize: document.getElementById("playback-domain-randomize"),
+      playbackCpu: document.getElementById("playback-cpu"),
+      playbackNoRender: document.getElementById("playback-no-render"),
+      playbackStochastic: document.getElementById("playback-stochastic"),
+      playbackStatus: document.getElementById("playback-status"),
+      playbackRunsPill: document.getElementById("playback-runs-pill"),
+      playbackCheckpointsPill: document.getElementById("playback-checkpoints-pill"),
+      playbackRootLabel: document.getElementById("playback-root-label"),
+      playbackCommand: document.getElementById("playback-command"),
+      copyPlaybackCommandBtn: document.getElementById("copy-playback-command-btn"),
+      resetPlaybackBtn: document.getElementById("reset-playback-btn"),
+    };
+
+    function formatNumber(value, digits = 3) {
+      if (value == null || !Number.isFinite(value)) return "-";
+      const abs = Math.abs(value);
+      if (abs >= 1000000) return value.toExponential(2);
+      if (abs >= 1000) return value.toFixed(0);
+      if (abs >= 10) return value.toFixed(2);
+      if (abs >= 1) return value.toFixed(digits);
+      if (abs === 0) return "0";
+      return value.toExponential(2);
+    }
+
+    function formatInteger(value) {
+      if (value == null || !Number.isFinite(value)) return "-";
+      return new Intl.NumberFormat("zh-CN").format(Math.round(value));
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || !Number.isFinite(bytes)) return "-";
+      const units = ["B", "KB", "MB", "GB"];
+      let size = bytes;
+      let idx = 0;
+      while (size >= 1024 && idx < units.length - 1) {
+        size /= 1024;
+        idx += 1;
+      }
+      return `${size.toFixed(size >= 100 ? 0 : size >= 10 ? 1 : 2)} ${units[idx]}`;
+    }
+
+    function formatDate(date) {
+      if (!(date instanceof Date) || Number.isNaN(date.valueOf())) return "-";
+      return new Intl.DateTimeFormat("zh-CN", {
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }).format(date);
+    }
+
+    function metricCategory(name, sampleValue) {
+      if (typeof sampleValue === "boolean") return "boolean";
+      if (name in CATEGORY_MAP) return CATEGORY_MAP[name];
+      if (name.includes("eval") || name.includes("best_")) return "evaluation";
+      if (name.includes("loss") || name.includes("kl") || name.includes("entropy") || name.includes("grad")) {
+        return "optimization";
+      }
+      if (name.includes("return") || name.includes("reward") || name.includes("len")) return "training";
+      if (name.includes("step") || name.includes("sps") || name.includes("rate")) return "system";
+      return "other";
+    }
+
+    function parseJsonl(text) {
+      const lines = text.split(/\r?\n/);
+      const rows = [];
+      const warnings = [];
+
+      lines.forEach((rawLine, index) => {
+        const line = rawLine.trim();
+        if (!line) return;
+        try {
+          rows.push(JSON.parse(line));
+        } catch (error) {
+          const isLastLine = index === lines.length - 1;
+          if (!isLastLine) {
+            warnings.push(`第 ${index + 1} 行 JSON 解析失败，已跳过`);
+          }
+        }
+      });
+
+      return { rows, warnings };
+    }
+
+    function summarizeRows(rows) {
+      const latest = rows.at(-1) || {};
+      const evalRows = rows.filter((row) => Number.isFinite(row.eval_return_mean));
+      const bestEvalRows = rows.filter((row) => Number.isFinite(row.best_eval_return));
+      const latestAvgReturn = [...rows].reverse().find((row) => Number.isFinite(row.avg_return_20));
+      const latestEval = [...rows].reverse().find((row) => Number.isFinite(row.eval_return_mean));
+      const bestEval = bestEvalRows.length
+        ? Math.max(...bestEvalRows.map((row) => row.best_eval_return))
+        : null;
+      const finiteRows = rows.filter((row) => row.finite_ok === true).length;
+      const totalRows = rows.length;
+      return [
+        {
+          label: "记录行数",
+          value: formatInteger(totalRows),
+          note: totalRows ? `最近 update=${latest.update ?? "-"}` : "尚无数据",
+        },
+        {
+          label: "当前 Step",
+          value: formatInteger(latest.global_step),
+          note: `update=${formatInteger(latest.update)}`,
+        },
+        {
+          label: "最近 Avg Return",
+          value: formatNumber(latestAvgReturn?.avg_return_20),
+          note: "窗口平均回报",
+        },
+        {
+          label: "最近 Eval Return",
+          value: formatNumber(latestEval?.eval_return_mean),
+          note: evalRows.length ? `共 ${evalRows.length} 次评估` : "暂无评估",
+        },
+        {
+          label: "Best Eval Return",
+          value: formatNumber(bestEval),
+          note: bestEvalRows.length ? `共 ${bestEvalRows.length} 次 best 更新` : "尚未写入 best_model",
+        },
+        {
+          label: "Finite OK",
+          value: `${finiteRows}/${totalRows || 0}`,
+          note: totalRows ? `占比 ${formatNumber((finiteRows / totalRows) * 100, 2)}%` : "等待数据",
+        },
+      ];
+    }
+
+    function collectMetrics(rows) {
+      const metricNames = new Set();
+      const sampleValue = new Map();
+
+      rows.forEach((row) => {
+        Object.entries(row).forEach(([key, value]) => {
+          if (key === "best_model") return;
+          if (value === null || value === undefined) return;
+          if (typeof value === "number" || typeof value === "boolean") {
+            metricNames.add(key);
+            if (!sampleValue.has(key)) sampleValue.set(key, value);
+          }
+        });
+      });
+
+      return Array.from(metricNames).map((name) => {
+        const values = rows.map((row, index) => {
+          const raw = row[name];
+          const x = resolveXValue(row, index);
+          if (typeof raw === "boolean") return { x, y: raw ? 1 : 0, raw };
+          if (typeof raw === "number" && Number.isFinite(raw)) return { x, y: raw, raw };
+          return { x, y: null, raw: null };
+        });
+
+        const valid = values.filter((point) => point.y != null);
+        const last = [...valid].reverse().find((point) => point.y != null) || null;
+        const yValues = valid.map((point) => point.y);
+        const category = metricCategory(name, sampleValue.get(name));
+        return {
+          name,
+          category,
+          type: typeof sampleValue.get(name) === "boolean" ? "boolean" : "number",
+          values,
+          last,
+          min: yValues.length ? Math.min(...yValues) : null,
+          max: yValues.length ? Math.max(...yValues) : null,
+          mean: yValues.length ? yValues.reduce((sum, v) => sum + v, 0) / yValues.length : null,
+          count: valid.length,
+        };
+      }).sort(sortMetrics);
+    }
+
+    function sortMetrics(a, b) {
+      const order = ["training", "evaluation", "optimization", "system", "boolean", "other"];
+      const aIdx = order.indexOf(a.category);
+      const bIdx = order.indexOf(b.category);
+      if (aIdx !== bIdx) return aIdx - bIdx;
+      return a.name.localeCompare(b.name);
+    }
+
+    function resolveXValue(row, index) {
+      if (state.xAxis === "update" && Number.isFinite(row.update)) return row.update;
+      if (state.xAxis === "index") return index + 1;
+      if (Number.isFinite(row.global_step)) return row.global_step;
+      if (Number.isFinite(row.update)) return row.update;
+      return index + 1;
+    }
+
+    function filterMetrics(metrics) {
+      const keyword = state.filter.trim().toLowerCase();
+      return metrics.filter((metric) => {
+        if (state.preset === "core" && !CORE_METRICS.includes(metric.name)) return false;
+        if (state.preset === "training" && metric.category !== "training") return false;
+        if (state.preset === "optimization" && metric.category !== "optimization") return false;
+        if (state.preset === "evaluation" && metric.category !== "evaluation") return false;
+        if (keyword && !metric.name.toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+    }
+
+    function svgChart(metric) {
+      const width = 540;
+      const height = 200;
+      const padX = 16;
+      const padTop = 16;
+      const padBottom = 20;
+      const valid = metric.values.filter((point) => point.y != null && Number.isFinite(point.x));
+
+      const style = CATEGORY_STYLE[metric.category] || CATEGORY_STYLE.other;
+
+      if (!valid.length) {
+        return `
+          <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${metric.name}">
+            ${gridLines(width, height, padX, padTop, padBottom)}
+            <text x="50%" y="50%" fill="rgba(235,246,255,0.45)" text-anchor="middle" font-size="14">
+              no data
+            </text>
+          </svg>
+        `;
+      }
+
+      const xMin = Math.min(...valid.map((point) => point.x));
+      const xMax = Math.max(...valid.map((point) => point.x));
+      let yMin = Math.min(...valid.map((point) => point.y));
+      let yMax = Math.max(...valid.map((point) => point.y));
+
+      if (metric.type === "boolean") {
+        yMin = 0;
+        yMax = 1;
+      } else if (yMin === yMax) {
+        const scale = Math.max(Math.abs(yMin), Math.abs(yMax), 1e-6);
+        const padding = scale < 1 ? scale * 0.5 : scale * 0.15;
+        yMin -= padding;
+        yMax += padding;
+      }
+
+      const xRange = Math.max(xMax - xMin, 1e-9);
+      const yRange = Math.max(yMax - yMin, 1e-9);
+      const bottomY = height - padBottom;
+
+      const points = valid.map((point) => {
+        const px = padX + ((point.x - xMin) / xRange) * (width - padX * 2);
+        const py = bottomY - ((point.y - yMin) / yRange) * (height - padTop - padBottom);
+        return { ...point, px, py };
+      });
+
+      const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.px.toFixed(2)} ${point.py.toFixed(2)}`).join(" ");
+      const areaPath = `${linePath} L ${points.at(-1).px.toFixed(2)} ${bottomY} L ${points[0].px.toFixed(2)} ${bottomY} Z`;
+      const lastPoint = points.at(-1);
+
+      const yTopLabel = metric.type === "boolean" ? "1" : escapeHtml(formatNumber(yMax));
+      const yBottomLabel = metric.type === "boolean" ? "0" : escapeHtml(formatNumber(yMin));
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${metric.name}">
+          <defs>
+            <linearGradient id="fill-${metric.name}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${style.color}" stop-opacity="0.28"></stop>
+              <stop offset="100%" stop-color="${style.color}" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+          ${gridLines(width, height, padX, padTop, padBottom)}
+          <path d="${areaPath}" fill="url(#fill-${metric.name})"></path>
+          <path d="${linePath}" fill="none" stroke="${style.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+          <circle cx="${lastPoint.px.toFixed(2)}" cy="${lastPoint.py.toFixed(2)}" r="5.5" fill="${style.color}" stroke="rgba(8,17,25,0.92)" stroke-width="3"></circle>
+          <text x="${width - 14}" y="18" text-anchor="end" fill="rgba(235,246,255,0.46)" font-size="12">${yTopLabel}</text>
+          <text x="${width - 14}" y="${height - 8}" text-anchor="end" fill="rgba(235,246,255,0.46)" font-size="12">${yBottomLabel}</text>
+        </svg>
+      `;
+    }
+
+    function gridLines(width, height, padX, padTop, padBottom) {
+      const rows = 3;
+      const bottomY = height - padBottom;
+      let markup = "";
+      for (let i = 0; i <= rows; i += 1) {
+        const y = padTop + ((bottomY - padTop) / rows) * i;
+        markup += `<line x1="${padX}" y1="${y.toFixed(2)}" x2="${width - padX}" y2="${y.toFixed(2)}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="5 7"></line>`;
+      }
+      return markup;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function render() {
+      const rows = state.rows;
+      const metrics = filterMetrics(collectMetrics(rows));
+
+      renderStatus();
+      renderSummary(rows);
+      renderPlayback();
+
+      elements.metricCount.textContent = `${metrics.length} 个指标`;
+      elements.chartGrid.innerHTML = "";
+
+      if (!rows.length) {
+        elements.emptyState.hidden = false;
+        elements.chartGrid.hidden = true;
+        return;
+      }
+
+      if (!metrics.length) {
+        elements.emptyState.hidden = false;
+        elements.chartGrid.hidden = true;
+        elements.emptyState.innerHTML = `
+          <h3>当前过滤条件下没有可显示的指标</h3>
+          <p>可以切到“全部指标”，或者清空上面的过滤关键词。</p>
+        `;
+        return;
+      }
+
+      elements.emptyState.hidden = true;
+      elements.chartGrid.hidden = false;
+
+      const fragment = document.createDocumentFragment();
+
+      metrics.forEach((metric) => {
+        const style = CATEGORY_STYLE[metric.category] || CATEGORY_STYLE.other;
+        const latestValue = metric.last ? metric.last.y : null;
+        const latestX = metric.last ? metric.last.x : null;
+        const card = document.createElement("article");
+        card.className = "chart-card";
+        card.innerHTML = `
+          <div class="chart-head">
+            <div class="chart-title-wrap">
+              <div class="chart-category">${style.label}</div>
+              <h3 class="chart-title">${escapeHtml(metric.name)}</h3>
+            </div>
+            <div class="chart-latest">
+              <strong>${metric.type === "boolean" ? (latestValue === 1 ? "true" : latestValue === 0 ? "false" : "-") : escapeHtml(formatNumber(latestValue))}</strong>
+              <span>latest @ ${escapeHtml(formatNumber(latestX, 2))}</span>
+            </div>
+          </div>
+          <div class="mini-stats">
+            <span>min <b>${escapeHtml(metric.type === "boolean" ? String(metric.min ?? "-") : formatNumber(metric.min))}</b></span>
+            <span>max <b>${escapeHtml(metric.type === "boolean" ? String(metric.max ?? "-") : formatNumber(metric.max))}</b></span>
+            <span>mean <b>${escapeHtml(metric.type === "boolean" ? formatNumber(metric.mean) : formatNumber(metric.mean))}</b></span>
+            <span>count <b>${escapeHtml(formatInteger(metric.count))}</b></span>
+          </div>
+          <div class="chart-stage">${svgChart(metric)}</div>
+          <div class="chart-footer">
+            <span>x-axis: ${escapeHtml(state.xAxis === "index" ? "row index" : state.xAxis)}</span>
+            <span>source: metrics.jsonl</span>
+          </div>
+        `;
+        fragment.appendChild(card);
+      });
+
+      elements.chartGrid.appendChild(fragment);
+    }
+
+    function renderStatus() {
+      elements.modePill.textContent = state.fileHandle ? "文件句柄模式" : state.snapshotFile ? "快照模式" : "未连接";
+      elements.modePill.className = `status-pill ${state.fileHandle ? "ok" : state.snapshotFile ? "warn" : ""}`.trim();
+
+      const refreshLabel = state.autoRefresh ? `自动刷新 ${state.intervalMs / 1000}s` : "自动刷新已关闭";
+      elements.refreshPill.textContent = refreshLabel;
+      elements.refreshPill.className = `status-pill ${state.autoRefresh ? "ok" : "warn"}`;
+
+      elements.rowsPill.textContent = `${formatInteger(state.rows.length)} 行`;
+      elements.filePath.textContent = state.fileLabel || "尚未选择文件";
+      elements.lastReadLabel.textContent = `最后读取: ${formatDate(state.lastRead)}`;
+      elements.fileSizeLabel.textContent = `大小: ${formatBytes(state.lastSize)}`;
+      elements.warningLabel.textContent = `警告: ${state.warnings.length ? state.warnings.join("；") : "-"}`;
+    }
+
+    function renderSummary(rows) {
+      const cards = summarizeRows(rows);
+      elements.summaryGrid.innerHTML = cards.map((card) => `
+        <article class="summary-card">
+          <div class="summary-label">${escapeHtml(card.label)}</div>
+          <div class="summary-value">${escapeHtml(card.value)}</div>
+          <div class="summary-note">${escapeHtml(card.note)}</div>
+        </article>
+      `).join("");
+    }
+
+    function quotePowerShell(value) {
+      return `'${String(value).replaceAll("'", "''")}'`;
+    }
+
+    function parseCheckpointOrder(fileName) {
+      if (fileName === "best_model.pt") return Number.NEGATIVE_INFINITY;
+      const match = fileName.match(/checkpoint_(\d+)\.pt$/);
+      return match ? Number(match[1]) : Number.POSITIVE_INFINITY;
+    }
+
+    function sortRunNameDesc(a, b) {
+      return b.localeCompare(a, "en");
+    }
+
+    function checkpointLabel(fileName) {
+      if (fileName === "best_model.pt") return "best_model.pt (默认最佳模型)";
+      const order = parseCheckpointOrder(fileName);
+      if (Number.isFinite(order)) return `${fileName} (update ${order})`;
+      return fileName;
+    }
+
+    function normalizeRunRecord(name) {
+      return {
+        name,
+        hasMetrics: false,
+        hasConfig: false,
+        hasBest: false,
+        checkpoints: [],
+      };
+    }
+
+    function finalizeRuns(runsMap) {
+      return Array.from(runsMap.values())
+        .map((run) => {
+          run.checkpoints.sort((a, b) => parseCheckpointOrder(b) - parseCheckpointOrder(a));
+          return run;
+        })
+        .sort((a, b) => sortRunNameDesc(a.name, b.name));
+    }
+
+    function collectRunFile(run, fileName) {
+      if (fileName === "metrics.jsonl") run.hasMetrics = true;
+      if (fileName === "config.json") run.hasConfig = true;
+      if (fileName === "best_model.pt") run.hasBest = true;
+      if (/^checkpoint_\d+\.pt$/.test(fileName)) run.checkpoints.push(fileName);
+    }
+
+    function buildRunsFromSnapshotFiles(files) {
+      const runsMap = new Map();
+
+      Array.from(files).forEach((file) => {
+        const relative = (file.webkitRelativePath || file.name).replaceAll("\\", "/");
+        const parts = relative.split("/").filter(Boolean);
+        if (parts.length < 2) return;
+
+        let runName = parts[0];
+        let fileName = parts.at(-1);
+
+        if (parts[0].toLowerCase() === "runs" && parts.length >= 3) {
+          runName = parts[1];
+          fileName = parts.at(-1);
+        }
+
+        if (!runsMap.has(runName)) runsMap.set(runName, normalizeRunRecord(runName));
+        collectRunFile(runsMap.get(runName), fileName);
+      });
+
+      return finalizeRuns(runsMap);
+    }
+
+    async function scanRunsFromHandle(directoryHandle) {
+      const runsMap = new Map();
+
+      for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+        if (entryHandle.kind !== "directory") continue;
+        const run = normalizeRunRecord(entryName);
+
+        for await (const [childName, childHandle] of entryHandle.entries()) {
+          if (childHandle.kind !== "file") continue;
+          collectRunFile(run, childName);
+        }
+
+        runsMap.set(entryName, run);
+      }
+
+      return finalizeRuns(runsMap);
+    }
+
+    function getSelectedRun() {
+      return state.playback.runs.find((run) => run.name === state.playback.selectedRun) || null;
+    }
+
+    function selectedCheckpointCount(run) {
+      if (!run) return 0;
+      return run.checkpoints.length + (run.hasBest ? 1 : 0);
+    }
+
+    function buildPlaybackCommand() {
+      const run = getSelectedRun();
+      if (!run) {
+        return ".\\run_best_carracing.ps1 -RunDir '.\\runs\\your_run'";
+      }
+
+      const parts = [
+        ".\\run_best_carracing.ps1",
+        "-RunDir",
+        quotePowerShell(`.\\runs\\${run.name}`),
+      ];
+
+      if (state.playback.selectedCheckpoint && state.playback.selectedCheckpoint !== "best") {
+        parts.push(
+          "-Checkpoint",
+          quotePowerShell(`.\\runs\\${run.name}\\${state.playback.selectedCheckpoint}`)
+        );
+      }
+
+      if (state.playback.episodes !== 3) parts.push("-Episodes", String(state.playback.episodes));
+      if (state.playback.fps !== 50) parts.push("-Fps", String(state.playback.fps));
+      if (state.playback.maxSteps > 0) parts.push("-MaxSteps", String(state.playback.maxSteps));
+      if (state.playback.cpu) parts.push("-Cpu");
+      if (state.playback.noRender) parts.push("-NoRender");
+      if (state.playback.stochastic) parts.push("-Stochastic");
+      if (state.playback.domainRandomize === "on") parts.push("-DomainRandomize");
+      if (state.playback.domainRandomize === "off") parts.push("-NoDomainRandomize");
+
+      return parts.join(" ");
+    }
+
+    function renderPlayback() {
+      const runs = state.playback.runs;
+      const run = getSelectedRun();
+      const checkpointCount = selectedCheckpointCount(run);
+
+      elements.runSelect.innerHTML = runs.length
+        ? runs.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("")
+        : `<option value="">先连接 runs 目录</option>`;
+
+      if (runs.length && (!state.playback.selectedRun || !runs.some((item) => item.name === state.playback.selectedRun))) {
+        state.playback.selectedRun = runs[0].name;
+      }
+      elements.runSelect.value = state.playback.selectedRun || "";
+
+      const selected = getSelectedRun();
+      const checkpointOptions = [];
+      if (selected) {
+        if (selected.hasBest) checkpointOptions.push({ value: "best", label: checkpointLabel("best_model.pt") });
+        selected.checkpoints.forEach((fileName) => {
+          checkpointOptions.push({ value: fileName, label: checkpointLabel(fileName) });
+        });
+      }
+
+      if (checkpointOptions.length) {
+        if (!checkpointOptions.some((item) => item.value === state.playback.selectedCheckpoint)) {
+          state.playback.selectedCheckpoint = checkpointOptions[0].value;
+        }
+        elements.checkpointSelect.disabled = false;
+        elements.checkpointSelect.innerHTML = checkpointOptions
+          .map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`)
+          .join("");
+        elements.checkpointSelect.value = state.playback.selectedCheckpoint;
+      } else {
+        state.playback.selectedCheckpoint = "";
+        elements.checkpointSelect.disabled = true;
+        elements.checkpointSelect.innerHTML = `<option value="">这个 run 暂时没有可回放的模型</option>`;
+      }
+
+      elements.playbackRunsPill.textContent = `${formatInteger(runs.length)} 个 run`;
+      elements.playbackCheckpointsPill.textContent = `${formatInteger(checkpointCount)} 个 checkpoint`;
+      elements.playbackRootLabel.textContent = `根目录: ${state.playback.rootLabel || "未连接"}`;
+
+      if (!selected) {
+        elements.playbackStatus.innerHTML = `先连接项目里的 <code>runs</code> 目录。页面会扫描每个 run 下的 <code>best_model.pt</code> 和 <code>checkpoint_*.pt</code>。`;
+      } else {
+        elements.playbackStatus.innerHTML = `当前 run: <code>${escapeHtml(selected.name)}</code>。默认优先使用 <code>best_model.pt</code>，也可以切到任意 checkpoint。`;
+      }
+
+      elements.playbackCommand.textContent = buildPlaybackCommand();
+    }
+
+    function resetPlaybackConfig() {
+      state.playback.selectedCheckpoint = "best";
+      state.playback.episodes = 3;
+      state.playback.fps = 50;
+      state.playback.maxSteps = 0;
+      state.playback.domainRandomize = "inherit";
+      state.playback.cpu = false;
+      state.playback.noRender = false;
+      state.playback.stochastic = false;
+
+      elements.playbackEpisodes.value = "3";
+      elements.playbackFps.value = "50";
+      elements.playbackMaxSteps.value = "0";
+      elements.playbackDomainRandomize.value = "inherit";
+      elements.playbackCpu.checked = false;
+      elements.playbackNoRender.checked = false;
+      elements.playbackStochastic.checked = false;
+
+      renderPlayback();
+    }
+
+    async function pickRunsDirectory() {
+      if (!window.showDirectoryPicker) {
+        state.warnings = ["当前浏览器不支持目录句柄，请改用右侧目录选择"];
+        renderStatus();
+        return;
+      }
+
+      try {
+        const handle = await window.showDirectoryPicker({ mode: "read" });
+        state.playback.runsHandle = handle;
+        state.playback.runsSnapshotFiles = [];
+        state.playback.rootLabel = handle.name;
+        state.playback.runs = await scanRunsFromHandle(handle);
+        state.playback.selectedRun = state.playback.runs[0]?.name || "";
+        state.playback.selectedCheckpoint = "best";
+        renderPlayback();
+      } catch (error) {
+        if (error && error.name === "AbortError") return;
+        state.warnings = [`选择 runs 目录失败: ${error.message}`];
+        renderStatus();
+      }
+    }
+
+    function onRunsDirectorySnapshotSelected(event) {
+      const files = event.target.files;
+      if (!files || !files.length) return;
+      state.playback.runsHandle = null;
+      state.playback.runsSnapshotFiles = Array.from(files);
+      const firstRelative = state.playback.runsSnapshotFiles[0].webkitRelativePath || "";
+      const rootName = firstRelative.replaceAll("\\", "/").split("/").filter(Boolean)[0] || "runs";
+      state.playback.rootLabel = `${rootName} (快照模式)`;
+      state.playback.runs = buildRunsFromSnapshotFiles(files);
+      state.playback.selectedRun = state.playback.runs[0]?.name || "";
+      state.playback.selectedCheckpoint = "best";
+      renderPlayback();
+    }
+
+    async function refreshRunsList() {
+      if (state.playback.runsHandle) {
+        state.playback.runs = await scanRunsFromHandle(state.playback.runsHandle);
+        if (!state.playback.runs.some((run) => run.name === state.playback.selectedRun)) {
+          state.playback.selectedRun = state.playback.runs[0]?.name || "";
+          state.playback.selectedCheckpoint = "best";
+        }
+        renderPlayback();
+        return;
+      }
+
+      if (state.playback.runsSnapshotFiles.length) {
+        state.playback.runs = buildRunsFromSnapshotFiles(state.playback.runsSnapshotFiles);
+        if (!state.playback.runs.some((run) => run.name === state.playback.selectedRun)) {
+          state.playback.selectedRun = state.playback.runs[0]?.name || "";
+          state.playback.selectedCheckpoint = "best";
+        }
+        renderPlayback();
+        return;
+      }
+
+      elements.playbackStatus.innerHTML = `还没有连接 <code>runs</code> 目录，无法刷新列表。`;
+    }
+
+    async function loadFromHandle(force = false) {
+      if (!state.fileHandle) return;
+      const file = await state.fileHandle.getFile();
+      if (!force && file.lastModified === state.lastModified && file.size === state.lastSize) return;
+      const text = await file.text();
+      applyLoadedText(text, file.name, file.size, file.lastModified);
+    }
+
+    async function loadFromSnapshot() {
+      if (!state.snapshotFile) return;
+      const text = await state.snapshotFile.text();
+      applyLoadedText(text, state.snapshotFile.name, state.snapshotFile.size, state.snapshotFile.lastModified);
+    }
+
+    function applyLoadedText(text, fileName, size, lastModified) {
+      const { rows, warnings } = parseJsonl(text);
+      state.rows = rows;
+      state.fileLabel = fileName;
+      state.lastSize = size;
+      state.lastModified = lastModified || 0;
+      state.lastRead = new Date();
+      state.warnings = warnings;
+      render();
+    }
+
+    async function refreshNow(force = false) {
+      try {
+        if (state.fileHandle) {
+          await loadFromHandle(force);
+        } else if (state.snapshotFile) {
+          await loadFromSnapshot();
+        }
+      } catch (error) {
+        state.warnings = [`读取失败: ${error.message}`];
+        renderStatus();
+      }
+    }
+
+    function resetTimer() {
+      if (state.timer) {
+        clearInterval(state.timer);
+        state.timer = null;
+      }
+      if (!state.autoRefresh) return;
+      state.timer = setInterval(() => {
+        refreshNow(false);
+      }, state.intervalMs);
+    }
+
+    async function pickFileHandle() {
+      if (!window.showOpenFilePicker) {
+        state.warnings = ["当前浏览器不支持文件句柄，请改用下面的文件选择"];
+        renderStatus();
+        return;
+      }
+
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          multiple: false,
+          types: [
+            {
+              description: "JSONL metrics",
+              accept: {
+                "application/json": [".jsonl", ".json", ".txt"],
+                "text/plain": [".jsonl", ".txt"],
+              },
+            },
+          ],
+        });
+
+        state.fileHandle = handle;
+        state.snapshotFile = null;
+        state.fileLabel = handle.name;
+        state.warnings = [];
+        await refreshNow(true);
+      } catch (error) {
+        if (error && error.name === "AbortError") return;
+        state.warnings = [`选择文件失败: ${error.message}`];
+        renderStatus();
+      }
+    }
+
+    function onSnapshotSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      state.snapshotFile = file;
+      state.fileHandle = null;
+      state.fileLabel = file.name;
+      state.warnings = ["当前为快照模式，训练继续写入后需要重新选择文件"];
+      refreshNow(true);
+    }
+
+    function bindEvents() {
+      elements.pickHandleBtn.addEventListener("click", pickFileHandle);
+      elements.refreshBtn.addEventListener("click", () => refreshNow(true));
+      elements.fileInput.addEventListener("change", onSnapshotSelected);
+      elements.pickRunsDirBtn.addEventListener("click", pickRunsDirectory);
+      elements.runsDirInput.addEventListener("change", onRunsDirectorySnapshotSelected);
+
+      elements.autoRefresh.addEventListener("change", (event) => {
+        state.autoRefresh = event.target.checked;
+        resetTimer();
+        renderStatus();
+      });
+
+      elements.intervalSelect.addEventListener("change", (event) => {
+        state.intervalMs = Number(event.target.value) || 2000;
+        resetTimer();
+        renderStatus();
+      });
+
+      elements.xAxisSelect.addEventListener("change", (event) => {
+        state.xAxis = event.target.value;
+        render();
+      });
+
+      elements.presetSelect.addEventListener("change", (event) => {
+        state.preset = event.target.value;
+        render();
+      });
+
+      elements.metricFilter.addEventListener("input", (event) => {
+        state.filter = event.target.value || "";
+        render();
+      });
+
+      elements.showCoreBtn.addEventListener("click", () => {
+        state.preset = "core";
+        elements.presetSelect.value = "core";
+        render();
+      });
+
+      elements.showAllBtn.addEventListener("click", () => {
+        state.preset = "all";
+        elements.presetSelect.value = "all";
+        render();
+      });
+
+      elements.runSelect.addEventListener("change", (event) => {
+        state.playback.selectedRun = event.target.value || "";
+        state.playback.selectedCheckpoint = "best";
+        renderPlayback();
+      });
+
+      elements.checkpointSelect.addEventListener("change", (event) => {
+        state.playback.selectedCheckpoint = event.target.value || "";
+        renderPlayback();
+      });
+
+      elements.playbackEpisodes.addEventListener("input", (event) => {
+        state.playback.episodes = Math.max(1, Number(event.target.value) || 1);
+        renderPlayback();
+      });
+
+      elements.playbackFps.addEventListener("input", (event) => {
+        state.playback.fps = Math.max(1, Number(event.target.value) || 1);
+        renderPlayback();
+      });
+
+      elements.playbackMaxSteps.addEventListener("input", (event) => {
+        state.playback.maxSteps = Math.max(0, Number(event.target.value) || 0);
+        renderPlayback();
+      });
+
+      elements.playbackDomainRandomize.addEventListener("change", (event) => {
+        state.playback.domainRandomize = event.target.value || "inherit";
+        renderPlayback();
+      });
+
+      elements.playbackCpu.addEventListener("change", (event) => {
+        state.playback.cpu = Boolean(event.target.checked);
+        renderPlayback();
+      });
+
+      elements.playbackNoRender.addEventListener("change", (event) => {
+        state.playback.noRender = Boolean(event.target.checked);
+        renderPlayback();
+      });
+
+      elements.playbackStochastic.addEventListener("change", (event) => {
+        state.playback.stochastic = Boolean(event.target.checked);
+        renderPlayback();
+      });
+
+      elements.copyPlaybackCommandBtn.addEventListener("click", async () => {
+        const command = buildPlaybackCommand();
+        try {
+          await navigator.clipboard.writeText(command);
+          elements.playbackStatus.innerHTML = `回放命令已复制到剪贴板。当前命令基于 <code>${escapeHtml(state.playback.selectedRun || "未选择 run")}</code>。`;
+        } catch (error) {
+          elements.playbackStatus.textContent = `复制失败: ${error.message}`;
+        }
+      });
+
+      elements.resetPlaybackBtn.addEventListener("click", () => {
+        resetPlaybackConfig();
+      });
+    }
+
+    bindEvents();
+    resetTimer();
+    render();
+  </script>
+</body>
+</html>
