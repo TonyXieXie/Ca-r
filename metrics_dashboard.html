@@ -202,7 +202,6 @@
     }
 
     button,
-    select,
     input[type="search"],
     input[type="number"] {
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -216,11 +215,9 @@
     }
 
     button:hover,
-    select:hover,
     input[type="search"]:hover,
     input[type="number"]:hover,
     button:focus-visible,
-    select:focus-visible,
     input[type="search"]:focus-visible,
     input[type="number"]:focus-visible {
       border-color: rgba(104, 225, 253, 0.42);
@@ -242,11 +239,277 @@
       background: rgba(255, 255, 255, 0.03);
     }
 
-    select,
     input[type="search"],
     input[type="number"] {
       padding: 11px 14px;
       min-height: 44px;
+    }
+
+    .select-shell {
+      position: relative;
+      min-width: 148px;
+      width: 100%;
+      isolation: isolate;
+    }
+
+    .inline .select-shell {
+      width: auto;
+      min-width: 132px;
+    }
+
+    .field .select-shell,
+    .field.full .select-shell {
+      width: 100%;
+    }
+
+    .native-select {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .select-trigger {
+      position: relative;
+      width: 100%;
+      min-height: 44px;
+      padding: 11px 44px 11px 14px;
+      border: 1px solid rgba(110, 214, 255, 0.22);
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+        rgba(17, 35, 48, 0.92);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: left;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 10px 24px rgba(0, 0, 0, 0.16);
+      transition:
+        border-color 140ms ease,
+        background 140ms ease,
+        box-shadow 140ms ease,
+        transform 140ms ease;
+      cursor: pointer;
+    }
+
+    .select-trigger:hover,
+    .select-shell:focus-within .select-trigger {
+      border-color: rgba(104, 225, 253, 0.46);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+        rgba(20, 40, 56, 0.95);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 0 0 4px rgba(104, 225, 253, 0.12),
+        0 16px 32px rgba(0, 0, 0, 0.22);
+    }
+
+    .select-shell.is-open .select-trigger {
+      border-color: rgba(104, 225, 253, 0.52);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+        rgba(18, 39, 55, 0.98);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 0 0 4px rgba(104, 225, 253, 0.14),
+        0 20px 40px rgba(0, 0, 0, 0.28);
+    }
+
+    .select-shell.is-disabled .select-trigger {
+      opacity: 0.48;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .select-trigger-value {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      padding-right: 8px;
+    }
+
+    .select-trigger-caret {
+      position: absolute;
+      top: 50%;
+      right: 14px;
+      width: 12px;
+      height: 12px;
+      transform: translateY(-50%);
+      transition: transform 180ms ease, opacity 140ms ease;
+      opacity: 0.84;
+      pointer-events: none;
+    }
+
+    .select-trigger-caret::before,
+    .select-trigger-caret::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      width: 8px;
+      height: 2px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .select-trigger-caret::before {
+      left: 0;
+      transform: rotate(45deg);
+      transform-origin: left center;
+    }
+
+    .select-trigger-caret::after {
+      right: 0;
+      transform: rotate(-45deg);
+      transform-origin: right center;
+    }
+
+    .select-shell.is-open .select-trigger-caret {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .select-panel {
+      position: absolute;
+      z-index: 30;
+      top: calc(100% + 10px);
+      left: 0;
+      right: 0;
+      padding: 8px;
+      border-radius: 18px;
+      border: 1px solid rgba(104, 225, 253, 0.2);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+        rgba(8, 20, 31, 0.98);
+      box-shadow:
+        0 24px 48px rgba(0, 0, 0, 0.34),
+        0 0 0 1px rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(18px);
+      opacity: 0;
+      transform: translateY(-8px) scale(0.985);
+      pointer-events: none;
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+
+    .select-shell.is-open .select-panel {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .select-options {
+      display: grid;
+      gap: 6px;
+      max-height: min(280px, 42vh);
+      overflow: auto;
+      padding-right: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(104, 225, 253, 0.28) transparent;
+    }
+
+    .select-options::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .select-options::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .select-options::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background: linear-gradient(180deg, rgba(104, 225, 253, 0.34), rgba(69, 240, 201, 0.24));
+      background-clip: padding-box;
+    }
+
+    .select-option {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      padding: 11px 13px;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text);
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+      transition:
+        border-color 120ms ease,
+        background 120ms ease,
+        transform 120ms ease,
+        color 120ms ease;
+    }
+
+    .select-option:hover,
+    .select-option:focus-visible {
+      border-color: rgba(104, 225, 253, 0.26);
+      background:
+        linear-gradient(135deg, rgba(104, 225, 253, 0.12), rgba(69, 240, 201, 0.07)),
+        rgba(255, 255, 255, 0.04);
+      transform: translateY(-1px);
+    }
+
+    .select-option.is-selected {
+      border-color: rgba(104, 225, 253, 0.34);
+      background:
+        linear-gradient(135deg, rgba(104, 225, 253, 0.18), rgba(69, 240, 201, 0.1)),
+        rgba(255, 255, 255, 0.05);
+      color: #f4fbff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .select-option.is-disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .select-option-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .select-option-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .select-option-check {
+      flex: 0 0 auto;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid rgba(104, 225, 253, 0.28);
+      background: rgba(104, 225, 253, 0.08);
+      box-shadow: inset 0 0 0 4px transparent;
+    }
+
+    .select-option.is-selected .select-option-check {
+      background: rgba(104, 225, 253, 0.18);
+      box-shadow: inset 0 0 0 4px rgba(104, 225, 253, 0.92);
+    }
+
+    .select-option-meta {
+      color: var(--text-faint);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .select-empty {
+      padding: 12px 13px;
+      border-radius: 14px;
+      color: var(--text-faint);
+      font-size: 13px;
+      background: rgba(255, 255, 255, 0.025);
     }
 
     input[type="file"] {
@@ -342,6 +605,258 @@
       grid-template-columns: minmax(340px, 1fr) minmax(420px, 1.15fr);
       gap: 14px;
       margin-bottom: 16px;
+    }
+
+    .combined-card {
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .combined-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .combined-copy {
+      max-width: 70ch;
+      color: var(--text-dim);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .combined-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .combined-toolbar .row {
+      gap: 12px;
+    }
+
+    .combined-note {
+      margin: 0 0 14px;
+      color: var(--text-faint);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .combined-legend {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .combined-legend-item {
+      display: grid;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+        rgba(255, 255, 255, 0.02);
+      min-width: 0;
+    }
+
+    .combined-legend-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .combined-legend-dot {
+      flex: 0 0 auto;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      box-shadow: 0 0 18px currentColor;
+    }
+
+    .combined-legend-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .combined-legend-meta {
+      color: var(--text-dim);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .combined-stage {
+      height: 340px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)),
+        rgba(0, 0, 0, 0.18);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .combined-stage svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .brush-block {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .brush-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brush-label {
+      color: var(--text-dim);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .brush-stage {
+      position: relative;
+      height: 92px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)),
+        rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .brush-overview,
+    .brush-overview svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .brush-shade {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: rgba(4, 10, 16, 0.54);
+      backdrop-filter: blur(2px);
+      pointer-events: none;
+      transition: left 80ms linear, width 80ms linear;
+    }
+
+    .brush-selection {
+      position: absolute;
+      top: 8px;
+      bottom: 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(104, 225, 253, 0.52);
+      background:
+        linear-gradient(135deg, rgba(104, 225, 253, 0.18), rgba(69, 240, 201, 0.1)),
+        rgba(255, 255, 255, 0.04);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 10px 24px rgba(0, 0, 0, 0.22);
+      transition: left 80ms linear, width 80ms linear;
+      cursor: grab;
+      overflow: hidden;
+    }
+
+    .brush-selection.is-dragging {
+      cursor: grabbing;
+    }
+
+    .brush-selection-body {
+      position: absolute;
+      inset: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: inherit;
+    }
+
+    .brush-grip {
+      width: 44px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      position: relative;
+    }
+
+    .brush-grip::before,
+    .brush-grip::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      width: 2px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.65);
+      box-shadow: 8px 0 0 rgba(255, 255, 255, 0.65), -8px 0 0 rgba(255, 255, 255, 0.65);
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .brush-handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 16px;
+      border: 0;
+      background: rgba(6, 19, 28, 0.72);
+      cursor: ew-resize;
+      padding: 0;
+    }
+
+    .brush-handle.left {
+      left: 0;
+      border-right: 1px solid rgba(104, 225, 253, 0.32);
+    }
+
+    .brush-handle.right {
+      right: 0;
+      border-left: 1px solid rgba(104, 225, 253, 0.32);
+    }
+
+    .brush-handle::before,
+    .brush-handle::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 2px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(235, 246, 255, 0.72);
+      transform: translateY(-50%);
+    }
+
+    .brush-handle.left::before,
+    .brush-handle.right::before {
+      left: 5px;
+    }
+
+    .brush-handle.left::after,
+    .brush-handle.right::after {
+      right: 5px;
     }
 
     .playback-card {
@@ -618,6 +1133,7 @@
       }
 
       .summary-grid,
+      .combined-legend,
       .playback-grid,
       .chart-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -650,6 +1166,7 @@
       }
 
       .summary-grid,
+      .combined-legend,
       .playback-grid,
       .chart-grid {
         grid-template-columns: 1fr;
@@ -771,6 +1288,52 @@
     </div>
 
     <section id="summary-grid" class="summary-grid"></section>
+
+    <section class="control-card combined-card">
+      <div class="combined-header">
+        <div>
+          <p class="control-title">组合观察</p>
+          <div class="combined-copy">
+            默认把关键训练指标叠在一张图里，方便直接观察奖励、探索、评估回报和 PPO 更新强度之间的关联。
+            这里按当前窗口内各自的最小值和最大值做归一化，所以重点是看同涨同跌，不是比绝对数值大小。
+          </div>
+        </div>
+        <div class="status-pill" id="combined-status">等待数据</div>
+      </div>
+
+      <div class="combined-toolbar">
+        <div class="row">
+          <button class="ghost" id="combined-full-history-btn" type="button">全历史</button>
+          <button class="ghost" id="combined-reset-window-btn" type="button">最近 400</button>
+        </div>
+        <div class="legend-chip" id="combined-axis-label">x-axis: global_step</div>
+      </div>
+
+      <p class="combined-note" id="combined-note">
+        组合图下方的横条就是缩放窗口。拖动两侧手柄改变观测长度，拖动中间高亮区域平移到别的时间段。
+      </p>
+
+      <div class="combined-legend" id="combined-legend"></div>
+      <div class="combined-stage" id="combined-chart"></div>
+      <div class="brush-block">
+        <div class="brush-header">
+          <div class="brush-label" id="combined-brush-label">当前窗口: 全历史</div>
+          <div class="brush-label">拖手柄缩放，拖中间区域平移</div>
+        </div>
+        <div class="brush-stage" id="combined-brush-stage">
+          <div class="brush-overview" id="combined-brush-overview"></div>
+          <div class="brush-shade" id="combined-brush-shade-left"></div>
+          <div class="brush-shade" id="combined-brush-shade-right"></div>
+          <div class="brush-selection" id="combined-brush-selection">
+            <button class="brush-handle left" id="combined-brush-handle-left" type="button" aria-label="调整左侧范围"></button>
+            <div class="brush-selection-body" id="combined-brush-body">
+              <span class="brush-grip" aria-hidden="true"></span>
+            </div>
+            <button class="brush-handle right" id="combined-brush-handle-right" type="button" aria-label="调整右侧范围"></button>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <section class="playback-grid">
       <article class="control-card playback-card">
@@ -914,6 +1477,25 @@
       "learning_rate",
     ];
 
+    const DEFAULT_COMBINED_METRICS = [
+      "entropy",
+      "rollout_reward_mean",
+      "rollout_reward_mean",
+      "best_eval_return",
+      "eval_return_mean",
+      "approx_kl",
+    ];
+
+    const COMBINED_METRIC_COLORS = {
+      entropy: "#68e1fd",
+      rollout_reward_mean: "#ffcf71",
+      best_eval_return: "#45f0c9",
+      eval_return_mean: "#aea1ff",
+      approx_kl: "#ff7b71",
+    };
+
+    const COMBINED_FALLBACK_COLORS = ["#68e1fd", "#ffcf71", "#45f0c9", "#aea1ff", "#ff7b71", "#b8ff6f"];
+
     const CATEGORY_MAP = {
       avg_return_20: "training",
       avg_ep_len_20: "training",
@@ -954,6 +1536,12 @@
       preset: "core",
       filter: "",
       timer: null,
+      combined: {
+        metrics: [...new Set(DEFAULT_COMBINED_METRICS)],
+        windowStart: 0,
+        windowEnd: 1,
+        drag: null,
+      },
       playback: {
         runsHandle: null,
         runsSnapshotFiles: [],
@@ -1012,7 +1600,278 @@
       playbackCommand: document.getElementById("playback-command"),
       copyPlaybackCommandBtn: document.getElementById("copy-playback-command-btn"),
       resetPlaybackBtn: document.getElementById("reset-playback-btn"),
+      combinedFullHistoryBtn: document.getElementById("combined-full-history-btn"),
+      combinedResetWindowBtn: document.getElementById("combined-reset-window-btn"),
+      combinedStatus: document.getElementById("combined-status"),
+      combinedAxisLabel: document.getElementById("combined-axis-label"),
+      combinedNote: document.getElementById("combined-note"),
+      combinedLegend: document.getElementById("combined-legend"),
+      combinedChart: document.getElementById("combined-chart"),
+      combinedBrushLabel: document.getElementById("combined-brush-label"),
+      combinedBrushStage: document.getElementById("combined-brush-stage"),
+      combinedBrushOverview: document.getElementById("combined-brush-overview"),
+      combinedBrushShadeLeft: document.getElementById("combined-brush-shade-left"),
+      combinedBrushShadeRight: document.getElementById("combined-brush-shade-right"),
+      combinedBrushSelection: document.getElementById("combined-brush-selection"),
+      combinedBrushHandleLeft: document.getElementById("combined-brush-handle-left"),
+      combinedBrushHandleRight: document.getElementById("combined-brush-handle-right"),
+      combinedBrushBody: document.getElementById("combined-brush-body"),
     };
+
+    const customSelects = new Map();
+
+    function splitOptionMeta(text) {
+      const value = String(text || "").trim();
+      const match = value.match(/^(.*?)(\s+\(([^()]+)\))$/);
+      if (!match) return { label: value, meta: "" };
+      return {
+        label: match[1].trim(),
+        meta: match[3].trim(),
+      };
+    }
+
+    function ensureCustomSelect(select) {
+      if (customSelects.has(select)) return customSelects.get(select);
+
+      select.classList.add("native-select");
+
+      const shell = document.createElement("div");
+      shell.className = "select-shell";
+
+      const trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = "select-trigger";
+      trigger.setAttribute("aria-haspopup", "listbox");
+      trigger.innerHTML = `
+        <span class="select-trigger-value"></span>
+        <span class="select-trigger-caret" aria-hidden="true"></span>
+      `;
+
+      const panel = document.createElement("div");
+      panel.className = "select-panel";
+      panel.hidden = true;
+
+      const list = document.createElement("div");
+      list.className = "select-options";
+      list.setAttribute("role", "listbox");
+      panel.appendChild(list);
+
+      select.parentNode.insertBefore(shell, select);
+      shell.append(select, trigger, panel);
+
+      const instance = { shell, trigger, panel, list };
+      customSelects.set(select, instance);
+
+      trigger.addEventListener("click", () => {
+        if (select.disabled) return;
+        if (shell.classList.contains("is-open")) {
+          closeCustomSelect(select);
+        } else {
+          openCustomSelect(select);
+        }
+      });
+
+      trigger.addEventListener("keydown", (event) => {
+        handleCustomSelectKeydown(event, select);
+      });
+
+      select.addEventListener("change", () => {
+        syncCustomSelect(select);
+      });
+
+      select.addEventListener("input", () => {
+        syncCustomSelect(select);
+      });
+
+      const observer = new MutationObserver(() => {
+        syncCustomSelect(select);
+      });
+      observer.observe(select, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["disabled"],
+      });
+
+      syncCustomSelect(select);
+      return instance;
+    }
+
+    function initializeCustomSelects() {
+      document.querySelectorAll("select").forEach((select) => {
+        ensureCustomSelect(select);
+      });
+      syncAllCustomSelects();
+    }
+
+    function syncAllCustomSelects() {
+      customSelects.forEach((_, select) => {
+        syncCustomSelect(select);
+      });
+    }
+
+    function openCustomSelect(select) {
+      const instance = ensureCustomSelect(select);
+      if (select.disabled) return;
+      closeAllCustomSelects(select);
+      instance.shell.classList.add("is-open");
+      instance.panel.hidden = false;
+      instance.trigger.setAttribute("aria-expanded", "true");
+      syncCustomSelect(select);
+      const selected = instance.list.querySelector(".select-option.is-selected");
+      if (selected) {
+        selected.scrollIntoView({ block: "nearest" });
+      }
+    }
+
+    function closeCustomSelect(select) {
+      const instance = customSelects.get(select);
+      if (!instance) return;
+      instance.shell.classList.remove("is-open");
+      instance.panel.hidden = true;
+      instance.trigger.setAttribute("aria-expanded", "false");
+    }
+
+    function closeAllCustomSelects(except = null) {
+      customSelects.forEach((_, select) => {
+        if (select === except) return;
+        closeCustomSelect(select);
+      });
+    }
+
+    function dispatchNativeSelectChange(select) {
+      select.dispatchEvent(new Event("input", { bubbles: true }));
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function setSelectedIndex(select, index) {
+      if (index < 0 || index >= select.options.length) return;
+      if (select.options[index].disabled) return;
+      select.selectedIndex = index;
+      dispatchNativeSelectChange(select);
+    }
+
+    function moveCustomSelect(select, direction) {
+      const options = Array.from(select.options);
+      const enabled = options
+        .map((option, index) => ({ option, index }))
+        .filter(({ option }) => !option.disabled);
+
+      if (!enabled.length) return;
+
+      const currentEnabledIndex = enabled.findIndex(({ index }) => index === select.selectedIndex);
+      const nextEnabledIndex = currentEnabledIndex < 0
+        ? 0
+        : (currentEnabledIndex + direction + enabled.length) % enabled.length;
+
+      setSelectedIndex(select, enabled[nextEnabledIndex].index);
+    }
+
+    function handleCustomSelectKeydown(event, select) {
+      if (select.disabled) return;
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        moveCustomSelect(select, 1);
+        openCustomSelect(select);
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        moveCustomSelect(select, -1);
+        openCustomSelect(select);
+        return;
+      }
+
+      if (event.key === "Home") {
+        event.preventDefault();
+        const first = Array.from(select.options).findIndex((option) => !option.disabled);
+        if (first >= 0) setSelectedIndex(select, first);
+        openCustomSelect(select);
+        return;
+      }
+
+      if (event.key === "End") {
+        event.preventDefault();
+        const options = Array.from(select.options);
+        const last = [...options].reverse().findIndex((option) => !option.disabled);
+        if (last >= 0) setSelectedIndex(select, options.length - 1 - last);
+        openCustomSelect(select);
+        return;
+      }
+
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const instance = customSelects.get(select);
+        if (!instance) return;
+        if (instance.shell.classList.contains("is-open")) {
+          closeCustomSelect(select);
+        } else {
+          openCustomSelect(select);
+        }
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeCustomSelect(select);
+        return;
+      }
+    }
+
+    function syncCustomSelect(select) {
+      const instance = ensureCustomSelect(select);
+      const { shell, trigger, panel, list } = instance;
+      const options = Array.from(select.options);
+      const selectedOption = options[select.selectedIndex] || options[0] || null;
+      const triggerValue = trigger.querySelector(".select-trigger-value");
+
+      triggerValue.textContent = selectedOption ? selectedOption.textContent.trim() : "请选择";
+      trigger.disabled = select.disabled;
+      shell.classList.toggle("is-disabled", select.disabled);
+      trigger.setAttribute("aria-expanded", shell.classList.contains("is-open") ? "true" : "false");
+      panel.hidden = !shell.classList.contains("is-open");
+
+      if (!options.length) {
+        list.innerHTML = `<div class="select-empty">没有可选项</div>`;
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+
+      options.forEach((option, index) => {
+        const button = document.createElement("button");
+        const selected = index === select.selectedIndex;
+        const disabled = option.disabled;
+        const { label, meta } = splitOptionMeta(option.textContent);
+
+        button.type = "button";
+        button.className = `select-option${selected ? " is-selected" : ""}${disabled ? " is-disabled" : ""}`;
+        button.setAttribute("role", "option");
+        button.setAttribute("aria-selected", selected ? "true" : "false");
+        button.dataset.index = String(index);
+        button.disabled = disabled;
+        button.innerHTML = `
+          <span class="select-option-main">
+            <span class="select-option-label">${escapeHtml(label)}</span>
+            <span class="select-option-check" aria-hidden="true"></span>
+          </span>
+          ${meta ? `<span class="select-option-meta">${escapeHtml(meta)}</span>` : ""}
+        `;
+
+        button.addEventListener("click", () => {
+          if (disabled) return;
+          setSelectedIndex(select, index);
+          closeCustomSelect(select);
+          trigger.focus();
+        });
+
+        fragment.appendChild(button);
+      });
+
+      list.replaceChildren(fragment);
+    }
 
     function formatNumber(value, digits = 3) {
       if (value == null || !Number.isFinite(value)) return "-";
@@ -1294,13 +2153,371 @@
         .replaceAll("'", "&#39;");
     }
 
+    function xAxisDisplayLabel() {
+      return state.xAxis === "index" ? "row index" : state.xAxis;
+    }
+
+    function combinedMetricColor(name, index) {
+      return COMBINED_METRIC_COLORS[name] || COMBINED_FALLBACK_COLORS[index % COMBINED_FALLBACK_COLORS.length];
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function combinedMinWindowRatio(totalRows) {
+      if (totalRows <= 1) return 1;
+      return Math.max(1 / totalRows, 0.003);
+    }
+
+    function combinedWindowSlice(rows, startRatio = state.combined.windowStart, endRatio = state.combined.windowEnd) {
+      if (!rows.length) {
+        return {
+          rows: [],
+          startIndex: 0,
+          endIndexExclusive: 0,
+        };
+      }
+
+      const total = rows.length;
+      const start = clamp(startRatio, 0, 1);
+      const end = clamp(endRatio, 0, 1);
+      const startIndex = clamp(Math.floor(start * (total - 1)), 0, total - 1);
+      const endIndexInclusive = clamp(Math.ceil(end * (total - 1)), startIndex, total - 1);
+      const endIndexExclusive = Math.min(total, endIndexInclusive + 1);
+
+      return {
+        rows: rows.slice(startIndex, endIndexExclusive),
+        startIndex,
+        endIndexExclusive,
+      };
+    }
+
+    function buildCombinedSeries(rows, startRatio = state.combined.windowStart, endRatio = state.combined.windowEnd) {
+      const { rows: windowRows, startIndex, endIndexExclusive } = combinedWindowSlice(rows, startRatio, endRatio);
+      const domain = windowRows.map((row, index) => ({
+        row,
+        globalIndex: startIndex + index,
+        x: resolveXValue(row, startIndex + index),
+      }));
+
+      const xValues = domain
+        .map((entry) => entry.x)
+        .filter((value) => Number.isFinite(value));
+
+      const series = state.combined.metrics
+        .filter((name, index, arr) => arr.indexOf(name) === index)
+        .map((name, index) => {
+          const points = domain
+            .map((entry) => {
+              const raw = entry.row[name];
+              if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
+              return {
+                x: entry.x,
+                raw,
+              };
+            })
+            .filter(Boolean);
+
+          const rawValues = points.map((point) => point.raw);
+          if (!rawValues.length) {
+            return null;
+          }
+
+          const min = Math.min(...rawValues);
+          const max = Math.max(...rawValues);
+          const range = Math.max(max - min, 1e-9);
+          const normalized = points.map((point) => ({
+            x: point.x,
+            y: min === max ? 0.5 : (point.raw - min) / range,
+            raw: point.raw,
+          }));
+
+          return {
+            name,
+            color: combinedMetricColor(name, index),
+            min,
+            max,
+            last: points.at(-1)?.raw ?? null,
+            count: points.length,
+            normalized,
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        series,
+        xMin: xValues.length ? Math.min(...xValues) : 0,
+        xMax: xValues.length ? Math.max(...xValues) : 1,
+        windowSize: windowRows.length,
+        startIndex,
+        endIndexExclusive,
+        totalRows: rows.length,
+      };
+    }
+
+    function combinedChartSvg(combined) {
+      const width = 1320;
+      const height = 360;
+      const padLeft = 20;
+      const padRight = 18;
+      const padTop = 20;
+      const padBottom = 28;
+      const bottomY = height - padBottom;
+      const innerWidth = width - padLeft - padRight;
+      const innerHeight = bottomY - padTop;
+      const xRange = Math.max(combined.xMax - combined.xMin, 1e-9);
+
+      const gridLines = Array.from({ length: 5 }, (_, index) => {
+        const y = padTop + (innerHeight / 4) * index;
+        const normalizedLabel = (1 - index / 4).toFixed(2);
+        return `
+          <line x1="${padLeft}" y1="${y.toFixed(2)}" x2="${width - padRight}" y2="${y.toFixed(2)}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="6 8"></line>
+          <text x="${width - padRight - 6}" y="${(y - 6).toFixed(2)}" text-anchor="end" fill="rgba(235,246,255,0.42)" font-size="11">${normalizedLabel}</text>
+        `;
+      }).join("");
+
+      const lineMarkup = combined.series.map((metric, index) => {
+        const points = metric.normalized.map((point) => {
+          const px = padLeft + ((point.x - combined.xMin) / xRange) * innerWidth;
+          const py = bottomY - point.y * innerHeight;
+          return { ...point, px, py };
+        });
+
+        if (!points.length) return "";
+
+        const path = points
+          .map((point, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${point.px.toFixed(2)} ${point.py.toFixed(2)}`)
+          .join(" ");
+        const lastPoint = points.at(-1);
+        const dash = index % 2 === 0 ? "" : ` stroke-dasharray="8 7"`;
+
+        return `
+          <path d="${path}" fill="none" stroke="${metric.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"${dash}></path>
+          <circle cx="${lastPoint.px.toFixed(2)}" cy="${lastPoint.py.toFixed(2)}" r="5.5" fill="${metric.color}" stroke="rgba(8,17,25,0.92)" stroke-width="3"></circle>
+        `;
+      }).join("");
+
+      const xStart = escapeHtml(formatNumber(combined.xMin, 2));
+      const xEnd = escapeHtml(formatNumber(combined.xMax, 2));
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="combined metrics">
+          <defs>
+            <linearGradient id="combined-bg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(104,225,253,0.04)"></stop>
+              <stop offset="100%" stop-color="rgba(104,225,253,0)"></stop>
+            </linearGradient>
+          </defs>
+          <rect x="${padLeft}" y="${padTop}" width="${innerWidth}" height="${innerHeight}" fill="url(#combined-bg)" rx="18"></rect>
+          ${gridLines}
+          ${lineMarkup}
+          <text x="${padLeft}" y="${height - 8}" fill="rgba(235,246,255,0.42)" font-size="11">${xStart}</text>
+          <text x="${width - padRight}" y="${height - 8}" text-anchor="end" fill="rgba(235,246,255,0.42)" font-size="11">${xEnd}</text>
+        </svg>
+      `;
+    }
+
+    function combinedBrushSvg(rows) {
+      const combined = buildCombinedSeries(rows, 0, 1);
+      const width = 1320;
+      const height = 92;
+      const padLeft = 10;
+      const padRight = 10;
+      const padTop = 10;
+      const padBottom = 12;
+      const innerWidth = width - padLeft - padRight;
+      const innerHeight = height - padTop - padBottom;
+      const bottomY = height - padBottom;
+      const xRange = Math.max(combined.xMax - combined.xMin, 1e-9);
+
+      const grid = Array.from({ length: 3 }, (_, index) => {
+        const y = padTop + (innerHeight / 2) * index;
+        return `<line x1="${padLeft}" y1="${y.toFixed(2)}" x2="${width - padRight}" y2="${y.toFixed(2)}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="5 8"></line>`;
+      }).join("");
+
+      const lines = combined.series.map((metric, index) => {
+        const points = metric.normalized.map((point) => {
+          const px = padLeft + ((point.x - combined.xMin) / xRange) * innerWidth;
+          const py = bottomY - point.y * innerHeight;
+          return { px, py };
+        });
+        if (!points.length) return "";
+        const path = points.map((point, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${point.px.toFixed(2)} ${point.py.toFixed(2)}`).join(" ");
+        const dash = index % 2 === 0 ? "" : ` stroke-dasharray="7 6"`;
+        return `<path d="${path}" fill="none" stroke="${metric.color}" stroke-width="2"${dash} stroke-linecap="round" stroke-linejoin="round" opacity="0.92"></path>`;
+      }).join("");
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="combined brush overview">
+          ${grid}
+          ${lines}
+        </svg>
+      `;
+    }
+
+    function setCombinedWindow(start, end) {
+      const totalRows = state.rows.length;
+      const minWindow = combinedMinWindowRatio(totalRows);
+      let nextStart = clamp(start, 0, 1);
+      let nextEnd = clamp(end, 0, 1);
+
+      if (nextEnd - nextStart < minWindow) {
+        if (nextStart <= 0) {
+          nextEnd = minWindow;
+        } else if (nextEnd >= 1) {
+          nextStart = 1 - minWindow;
+        } else {
+          nextEnd = nextStart + minWindow;
+        }
+      }
+
+      if (nextEnd > 1) {
+        const width = nextEnd - nextStart;
+        nextEnd = 1;
+        nextStart = Math.max(0, 1 - width);
+      }
+
+      state.combined.windowStart = clamp(nextStart, 0, 1);
+      state.combined.windowEnd = clamp(nextEnd, 0, 1);
+    }
+
+    function pointerRatioWithinBrush(clientX) {
+      const rect = elements.combinedBrushStage.getBoundingClientRect();
+      if (!rect.width) return 0;
+      return clamp((clientX - rect.left) / rect.width, 0, 1);
+    }
+
+    function updateCombinedDrag(clientX) {
+      const drag = state.combined.drag;
+      if (!drag) return;
+      const ratio = pointerRatioWithinBrush(clientX);
+      const delta = ratio - drag.pointerRatio;
+      const minWindow = combinedMinWindowRatio(state.rows.length);
+
+      if (drag.mode === "move") {
+        const width = drag.end - drag.start;
+        const nextStart = clamp(drag.start + delta, 0, 1 - width);
+        setCombinedWindow(nextStart, nextStart + width);
+      } else if (drag.mode === "left") {
+        const nextStart = clamp(drag.start + delta, 0, drag.end - minWindow);
+        setCombinedWindow(nextStart, drag.end);
+      } else if (drag.mode === "right") {
+        const nextEnd = clamp(drag.end + delta, drag.start + minWindow, 1);
+        setCombinedWindow(drag.start, nextEnd);
+      }
+
+      renderCombined(state.rows);
+    }
+
+    function endCombinedDrag() {
+      state.combined.drag = null;
+      elements.combinedBrushSelection.classList.remove("is-dragging");
+    }
+
+    function startCombinedDrag(mode, clientX) {
+      state.combined.drag = {
+        mode,
+        pointerRatio: pointerRatioWithinBrush(clientX),
+        start: state.combined.windowStart,
+        end: state.combined.windowEnd,
+      };
+      if (mode === "move") {
+        elements.combinedBrushSelection.classList.add("is-dragging");
+      }
+    }
+
+    function renderCombined(rows) {
+      const combined = buildCombinedSeries(rows);
+      elements.combinedAxisLabel.textContent = `x-axis: ${xAxisDisplayLabel()}`;
+
+      if (!rows.length || !combined.series.length) {
+        elements.combinedStatus.textContent = "等待数据";
+        elements.combinedBrushLabel.textContent = "当前窗口: 无数据";
+        elements.combinedLegend.innerHTML = `
+          <div class="combined-legend-item">
+            <div class="combined-legend-meta">当前还没有足够的数据来绘制组合图。</div>
+          </div>
+        `;
+        elements.combinedChart.innerHTML = `
+          <svg viewBox="0 0 1320 360" role="img" aria-label="combined metrics empty">
+            <text x="50%" y="50%" fill="rgba(235,246,255,0.45)" text-anchor="middle" font-size="18">
+              no combined data
+            </text>
+          </svg>
+        `;
+        elements.combinedBrushOverview.innerHTML = `
+          <svg viewBox="0 0 1320 92" role="img" aria-label="combined brush overview empty">
+            <text x="50%" y="50%" fill="rgba(235,246,255,0.42)" text-anchor="middle" font-size="14">
+              no overview
+            </text>
+          </svg>
+        `;
+        elements.combinedBrushSelection.style.left = "0%";
+        elements.combinedBrushSelection.style.width = "100%";
+        elements.combinedBrushShadeLeft.style.left = "0";
+        elements.combinedBrushShadeLeft.style.width = "0";
+        elements.combinedBrushShadeRight.style.left = "100%";
+        elements.combinedBrushShadeRight.style.width = "0";
+        return;
+      }
+
+      const usingFullHistory = state.combined.windowStart <= 0.0001 && state.combined.windowEnd >= 0.9999;
+      elements.combinedStatus.textContent = usingFullHistory
+        ? `全历史 ${combined.windowSize} 条`
+        : `窗口 ${combined.windowSize} 条`;
+
+      elements.combinedLegend.innerHTML = combined.series.map((metric) => `
+        <article class="combined-legend-item">
+          <div class="combined-legend-main">
+            <span class="combined-legend-dot" style="color: ${metric.color}; background: ${metric.color};"></span>
+            <div class="combined-legend-name">${escapeHtml(metric.name)}</div>
+          </div>
+          <div class="combined-legend-meta">
+            latest ${escapeHtml(formatNumber(metric.last))}<br />
+            range ${escapeHtml(formatNumber(metric.min))} -> ${escapeHtml(formatNumber(metric.max))} · ${escapeHtml(formatInteger(metric.count))} 点
+          </div>
+        </article>
+      `).join("");
+
+      const missing = state.combined.metrics.filter((name) => !combined.series.some((metric) => metric.name === name));
+      const dedupedCount = new Set(DEFAULT_COMBINED_METRICS).size;
+      elements.combinedNote.textContent = `${
+        usingFullHistory ? "当前显示全历史记录。" : `当前窗口覆盖第 ${combined.startIndex + 1} 到第 ${combined.endIndexExclusive} 条记录。`
+      } 组合图按每条线在当前窗口内单独归一化。默认组合清单包含 ${dedupedCount} 个唯一指标。${
+        missing.length ? ` 缺失字段: ${missing.join(", ")}。` : ""
+      }`;
+
+      elements.combinedChart.innerHTML = combinedChartSvg(combined);
+      elements.combinedBrushOverview.innerHTML = combinedBrushSvg(rows);
+
+      const leftPercent = state.combined.windowStart * 100;
+      const widthPercent = Math.max((state.combined.windowEnd - state.combined.windowStart) * 100, 0);
+      elements.combinedBrushSelection.style.left = `${leftPercent}%`;
+      elements.combinedBrushSelection.style.width = `${widthPercent}%`;
+      elements.combinedBrushShadeLeft.style.left = "0";
+      elements.combinedBrushShadeLeft.style.width = `${leftPercent}%`;
+      elements.combinedBrushShadeRight.style.left = `${leftPercent + widthPercent}%`;
+      elements.combinedBrushShadeRight.style.width = `${Math.max(0, 100 - leftPercent - widthPercent)}%`;
+
+      const startRow = combined.startIndex + 1;
+      const endRow = combined.endIndexExclusive;
+      const xStart = formatNumber(combined.xMin, 2);
+      const xEnd = formatNumber(combined.xMax, 2);
+      elements.combinedBrushLabel.textContent = usingFullHistory
+        ? `当前窗口: 全历史 ${combined.totalRows} 条`
+        : `当前窗口: 第 ${startRow} - ${endRow} 条 · ${xAxisDisplayLabel()} ${xStart} -> ${xEnd}`;
+    }
+
     function render() {
       const rows = state.rows;
       const metrics = filterMetrics(collectMetrics(rows));
 
       renderStatus();
       renderSummary(rows);
+      renderCombined(rows);
       renderPlayback();
+      syncAllCustomSelects();
 
       elements.metricCount.textContent = `${metrics.length} 个指标`;
       elements.chartGrid.innerHTML = "";
@@ -1566,6 +2783,7 @@
       }
 
       elements.playbackCommand.textContent = buildPlaybackCommand();
+      syncAllCustomSelects();
     }
 
     function resetPlaybackConfig() {
@@ -1743,6 +2961,23 @@
     }
 
     function bindEvents() {
+      document.addEventListener("pointerdown", (event) => {
+        const clickedInside = Array.from(customSelects.values()).some(({ shell }) => shell.contains(event.target));
+        if (!clickedInside) closeAllCustomSelects();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeAllCustomSelects();
+      });
+
+      window.addEventListener("blur", () => {
+        closeAllCustomSelects();
+      });
+
+      window.addEventListener("resize", () => {
+        closeAllCustomSelects();
+      });
+
       elements.pickHandleBtn.addEventListener("click", pickFileHandle);
       elements.refreshBtn.addEventListener("click", () => refreshNow(true));
       elements.fileInput.addEventListener("change", onSnapshotSelected);
@@ -1777,6 +3012,74 @@
       elements.metricFilter.addEventListener("input", (event) => {
         state.filter = event.target.value || "";
         render();
+      });
+
+      elements.combinedFullHistoryBtn.addEventListener("click", () => {
+        setCombinedWindow(0, 1);
+        render();
+      });
+
+      elements.combinedResetWindowBtn.addEventListener("click", () => {
+        if (!state.rows.length) {
+          setCombinedWindow(0, 1);
+        } else {
+          const total = state.rows.length;
+          const width = Math.min(400 / total, 1);
+          setCombinedWindow(1 - width, 1);
+        }
+        render();
+      });
+
+      elements.combinedBrushHandleLeft.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        startCombinedDrag("left", event.clientX);
+      });
+
+      elements.combinedBrushHandleRight.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        startCombinedDrag("right", event.clientX);
+      });
+
+      elements.combinedBrushBody.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        startCombinedDrag("move", event.clientX);
+      });
+
+      elements.combinedBrushStage.addEventListener("pointerdown", (event) => {
+        if (
+          event.target === elements.combinedBrushHandleLeft ||
+          event.target === elements.combinedBrushHandleRight ||
+          elements.combinedBrushBody.contains(event.target)
+        ) {
+          return;
+        }
+
+        const total = state.rows.length;
+        if (!total) return;
+
+        const ratio = pointerRatioWithinBrush(event.clientX);
+        const width = state.combined.windowEnd - state.combined.windowStart;
+        const nextStart = clamp(ratio - width / 2, 0, 1 - width);
+        setCombinedWindow(nextStart, nextStart + width);
+        render();
+      });
+
+      document.addEventListener("pointermove", (event) => {
+        if (!state.combined.drag) return;
+        event.preventDefault();
+        updateCombinedDrag(event.clientX);
+      });
+
+      document.addEventListener("pointerup", () => {
+        if (state.combined.drag) {
+          endCombinedDrag();
+        }
+      });
+
+      document.addEventListener("pointercancel", () => {
+        if (state.combined.drag) {
+          endCombinedDrag();
+        }
       });
 
       elements.showCoreBtn.addEventListener("click", () => {
@@ -1852,6 +3155,7 @@
       });
     }
 
+    initializeCustomSelects();
     bindEvents();
     resetTimer();
     render();
