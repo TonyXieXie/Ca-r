@@ -8,6 +8,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 
+from carracing_observation import make_carracing_env
 from ppo_pixel_policy import CarRacingPPOPolicy
 
 
@@ -137,6 +138,7 @@ def main() -> None:
 
     num_frames = int(checkpoint_args.get("num_frames", 4))
     image_size = int(checkpoint_args.get("image_size", 96))
+    obs_source = str(checkpoint_args.get("obs_source", "state_pixels"))
     seed = int(checkpoint_args.get("seed", 7)) if args.seed is None else int(args.seed)
     domain_randomize = bool(checkpoint_args.get("domain_randomize", False))
     if args.domain_randomize is not None:
@@ -147,11 +149,12 @@ def main() -> None:
     policy.eval()
 
     render_mode = None if args.render_mode == "none" else args.render_mode
-    env = gym.make(
-        "CarRacing-v3",
-        continuous=True,
+    env = make_carracing_env(
         domain_randomize=domain_randomize,
         render_mode=render_mode,
+        obs_source=obs_source,
+        image_size=image_size,
+        continuous=True,
     )
 
     if render_mode == "human" and args.fps > 0 and hasattr(env, "metadata"):
@@ -160,6 +163,8 @@ def main() -> None:
     print(f"checkpoint={checkpoint_path}")
     print(f"device={device}")
     print(f"num_frames={num_frames}")
+    print(f"image_size={image_size}")
+    print(f"obs_source={obs_source}")
     print(f"seed={seed}")
     print(f"domain_randomize={domain_randomize}")
     print(f"deterministic={not args.stochastic}")

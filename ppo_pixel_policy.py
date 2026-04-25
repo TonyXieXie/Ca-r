@@ -48,10 +48,17 @@ class PolicyStep:
 class PixelEncoder(nn.Module):
     """CNN encoder for stacked CarRacing frames."""
 
-    def __init__(self, in_channels: int = 12, image_size: int = 96, feature_dim: int = 512) -> None:
+    def __init__(
+        self,
+        in_channels: int = 12,
+        image_size: int = 96,
+        feature_dim: int = 512,
+        pooled_size: int = 6,
+    ) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.image_size = image_size
+        self.pooled_size = pooled_size
 
         self.conv = nn.Sequential(
             _init_layer(nn.Conv2d(in_channels, 32, kernel_size=8, stride=4)),
@@ -63,10 +70,11 @@ class PixelEncoder(nn.Module):
             _init_layer(nn.Conv2d(64, 128, kernel_size=3, stride=1)),
             nn.ReLU(),
         )
+        self.pool = nn.AdaptiveAvgPool2d((pooled_size, pooled_size))
 
         with torch.no_grad():
             dummy = torch.zeros(1, in_channels, image_size, image_size)
-            conv_out_dim = self.conv(dummy).flatten(1).shape[1]
+            conv_out_dim = self.pool(self.conv(dummy)).flatten(1).shape[1]
 
         self.fc = nn.Sequential(
             _init_layer(nn.Linear(conv_out_dim, feature_dim)),
@@ -111,6 +119,7 @@ class PixelEncoder(nn.Module):
     def forward(self, obs: Tensor) -> Tensor:
         x = self.preprocess(obs)
         x = self.conv(x)
+        x = self.pool(x)
         x = x.flatten(1)
         return self.fc(x)
 
@@ -240,4 +249,3 @@ class CarRacingPPOPolicy(nn.Module):
 
 
 __all__ = ["CarRacingPPOPolicy", "PixelEncoder", "PolicyStep"]
-

@@ -4,10 +4,18 @@ param(
     [int]$TotalTimesteps = 1000000,
     [int]$NumEnvs = 4,
     [int]$NumSteps = 128,
+    [ValidateSet("sync", "async")]
+    [string]$VectorBackend = "sync",
     [int]$NumFrames = 1,
     [int]$ImageSize = 256,
+    [ValidateSet("state_pixels", "rgb_array")]
+    [string]$ObsSource = "rgb_array",
     [int]$EvalEvery = 5,
     [int]$EvalEpisodes = 3,
+    [ValidateSet("sync", "async")]
+    [string]$EvalMode = "async",
+    [ValidateSet("auto", "cpu", "cuda")]
+    [string]$EvalDevice = "",
     [switch]$Cpu,
     [switch]$CaptureVideo,
     [switch]$DomainRandomize,
@@ -45,6 +53,13 @@ $metricsFile = Join-Path $saveDir "metrics.jsonl"
 New-Item -ItemType Directory -Path $saveDir -Force | Out-Null
 
 $device = if ($Cpu) { "cpu" } else { "auto" }
+$resolvedEvalDevice = if (-not [string]::IsNullOrWhiteSpace($EvalDevice)) {
+    $EvalDevice
+} elseif ($Cpu) {
+    "cpu"
+} else {
+    "cuda"
+}
 
 $argsList = @(
     $script,
@@ -52,10 +67,14 @@ $argsList = @(
     "--total-timesteps", "$TotalTimesteps",
     "--num-envs", "$NumEnvs",
     "--num-steps", "$NumSteps",
+    "--vector-backend", $VectorBackend,
     "--num-frames", "$NumFrames",
     "--image-size", "$ImageSize",
+    "--obs-source", $ObsSource,
     "--eval-every", "$EvalEvery",
     "--eval-episodes", "$EvalEpisodes",
+    "--eval-mode", $EvalMode,
+    "--eval-device", $resolvedEvalDevice,
     "--save-every", "10",
     "--log-every", "1",
     "--device", $device
@@ -73,9 +92,19 @@ Write-Output "Metrics file: $metricsFile"
 
 Push-Location $root
 try {
-    & $python @argsList 2>&1 | Tee-Object -FilePath $logFile
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        & $python @argsList 2>&1 | Tee-Object -FilePath $logFile
+        if ($LASTEXITCODE -ne 0) {
+            throw "Training process failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
 }
 finally {
     Pop-Location
 }
-
