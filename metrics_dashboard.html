@@ -2028,12 +2028,23 @@
     function formatNumber(value, digits = 3) {
       if (value == null || !Number.isFinite(value)) return "-";
       const abs = Math.abs(value);
-      if (abs >= 1000000) return value.toExponential(2);
-      if (abs >= 1000) return value.toFixed(0);
-      if (abs >= 10) return value.toFixed(2);
-      if (abs >= 1) return value.toFixed(digits);
       if (abs === 0) return "0";
-      return value.toExponential(2);
+
+      let decimals = digits;
+      if (abs >= 1000) {
+        decimals = abs >= 100000 ? 0 : abs >= 10000 ? 1 : 2;
+      } else if (abs >= 10) {
+        decimals = 2;
+      } else if (abs >= 1) {
+        decimals = digits;
+      } else {
+        const leadingZeroes = Math.max(0, Math.ceil(-Math.log10(abs)) - 1);
+        decimals = Math.min(12, leadingZeroes + digits);
+      }
+
+      const rounded = Number(value.toFixed(decimals));
+      const normalized = Object.is(rounded, -0) ? 0 : rounded;
+      return normalized.toLocaleString("zh-CN", { maximumFractionDigits: decimals });
     }
 
     function formatInteger(value) {
@@ -2100,10 +2111,11 @@
     }
 
     function summarizeRows(rows) {
-      const latest = rows.at(-1) || {};
+      const trainingRows = rows.filter((row) => row.record_type !== "eval_result");
+      const latest = trainingRows.at(-1) || rows.at(-1) || {};
       const evalRows = rows.filter((row) => Number.isFinite(row.eval_return_mean));
       const bestEvalRows = rows.filter((row) => Number.isFinite(row.best_eval_return));
-      const latestAvgReturn = [...rows].reverse().find((row) => Number.isFinite(row.avg_return_20));
+      const latestAvgReturn = [...trainingRows].reverse().find((row) => Number.isFinite(row.avg_return_20));
       const latestEval = [...rows].reverse().find((row) => Number.isFinite(row.eval_return_mean));
       const bestEval = bestEvalRows.length
         ? Math.max(...bestEvalRows.map((row) => row.best_eval_return))
@@ -2144,13 +2156,25 @@
       ];
     }
 
+    function rowHasMetricValue(row, name) {
+      const value = row[name];
+      return typeof value === "number" || typeof value === "boolean";
+    }
+
+    function rowMatchesMetricRecordType(row, name, category) {
+      if (row.record_type === "eval_result") {
+        return category === "evaluation" || name === "global_step" || name === "update";
+      }
+      return category !== "evaluation" || rowHasMetricValue(row, name);
+    }
+
     function collectMetrics(rows) {
       const metricNames = new Set();
       const sampleValue = new Map();
 
       rows.forEach((row) => {
         Object.entries(row).forEach(([key, value]) => {
-          if (key === "best_model") return;
+          if (key === "best_model" || key === "record_type") return;
           if (value === null || value === undefined) return;
           if (typeof value === "number" || typeof value === "boolean") {
             metricNames.add(key);
@@ -2160,7 +2184,9 @@
       });
 
       return Array.from(metricNames).map((name) => {
+        const category = metricCategory(name, sampleValue.get(name));
         const values = rows.map((row, index) => {
+          if (!rowMatchesMetricRecordType(row, name, category)) return { x: resolveXValue(row, index), y: null, raw: null };
           const raw = row[name];
           const x = resolveXValue(row, index);
           if (typeof raw === "boolean") return { x, y: raw ? 1 : 0, raw };
@@ -2171,7 +2197,6 @@
         const valid = values.filter((point) => point.y != null);
         const last = [...valid].reverse().find((point) => point.y != null) || null;
         const yValues = valid.map((point) => point.y);
-        const category = metricCategory(name, sampleValue.get(name));
         return {
           name,
           category,

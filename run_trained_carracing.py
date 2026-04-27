@@ -8,7 +8,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 
-from carracing_observation import make_carracing_env
+from carracing_obs import init_frame_stack, resize_observations, update_frame_stack
 from ppo_pixel_policy import CarRacingPPOPolicy
 
 
@@ -86,19 +86,6 @@ def choose_device(device_arg: str) -> torch.device:
         return torch.device("cuda")
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-def init_frame_stack(obs: np.ndarray, num_frames: int) -> np.ndarray:
-    return np.repeat(obs[:, None, ...], repeats=num_frames, axis=1)
-
-
-def update_frame_stack(stacked_obs: np.ndarray, next_obs: np.ndarray, done: np.ndarray) -> np.ndarray:
-    stacked_obs = np.roll(stacked_obs, shift=-1, axis=1)
-    stacked_obs[:, -1] = next_obs
-    if np.any(done):
-        stacked_obs[done] = np.repeat(next_obs[done, None, ...], repeats=stacked_obs.shape[1], axis=1)
-    return stacked_obs
-
-
 def resolve_checkpoint(run_dir: Path, checkpoint: Path | None) -> Path:
     if checkpoint is not None:
         resolved = checkpoint
@@ -138,7 +125,6 @@ def main() -> None:
 
     num_frames = int(checkpoint_args.get("num_frames", 4))
     image_size = int(checkpoint_args.get("image_size", 96))
-    obs_source = str(checkpoint_args.get("obs_source", "state_pixels"))
     seed = int(checkpoint_args.get("seed", 7)) if args.seed is None else int(args.seed)
     domain_randomize = bool(checkpoint_args.get("domain_randomize", False))
     if args.domain_randomize is not None:
@@ -149,12 +135,11 @@ def main() -> None:
     policy.eval()
 
     render_mode = None if args.render_mode == "none" else args.render_mode
-    env = make_carracing_env(
+    env = gym.make(
+        "CarRacing-v3",
+        continuous=True,
         domain_randomize=domain_randomize,
         render_mode=render_mode,
-        obs_source=obs_source,
-        image_size=image_size,
-        continuous=True,
     )
 
     if render_mode == "human" and args.fps > 0 and hasattr(env, "metadata"):
@@ -164,7 +149,6 @@ def main() -> None:
     print(f"device={device}")
     print(f"num_frames={num_frames}")
     print(f"image_size={image_size}")
-    print(f"obs_source={obs_source}")
     print(f"seed={seed}")
     print(f"domain_randomize={domain_randomize}")
     print(f"deterministic={not args.stochastic}")
@@ -178,6 +162,7 @@ def main() -> None:
     try:
         for episode in range(args.episodes):
             obs, _ = env.reset(seed=seed + episode)
+            obs = resize_observations(obs, image_size)
             stacked_obs = init_frame_stack(obs[None, ...], num_frames)
             ep_return = 0.0
             ep_length = 0
@@ -190,6 +175,7 @@ def main() -> None:
 
                 action = policy_step.action[0].detach().cpu().numpy().astype(np.float32)
                 next_obs, reward, terminated, truncated, info = env.step(action)
+                next_obs = resize_observations(next_obs, image_size)
                 done = bool(terminated or truncated)
                 ep_return += float(reward)
                 ep_length += 1

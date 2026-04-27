@@ -4,18 +4,16 @@ param(
     [int]$TotalTimesteps = 1000000,
     [int]$NumEnvs = 4,
     [int]$NumSteps = 128,
-    [ValidateSet("sync", "async")]
-    [string]$VectorBackend = "sync",
     [int]$NumFrames = 1,
-    [int]$ImageSize = 256,
-    [ValidateSet("state_pixels", "rgb_array")]
-    [string]$ObsSource = "rgb_array",
+    [int]$ImageSize = 96,
+    [ValidateSet("async", "sync")]
+    [string]$VectorEnv = "async",
     [int]$EvalEvery = 5,
     [int]$EvalEpisodes = 3,
-    [ValidateSet("sync", "async")]
-    [string]$EvalMode = "async",
-    [ValidateSet("auto", "cpu", "cuda")]
-    [string]$EvalDevice = "",
+    [switch]$NoAsyncEval,
+    [int]$MaxPendingEvals = 4,
+    [ValidateSet("async", "sync")]
+    [string]$EvalVectorEnv = "async",
     [switch]$Cpu,
     [switch]$CaptureVideo,
     [switch]$DomainRandomize,
@@ -53,13 +51,6 @@ $metricsFile = Join-Path $saveDir "metrics.jsonl"
 New-Item -ItemType Directory -Path $saveDir -Force | Out-Null
 
 $device = if ($Cpu) { "cpu" } else { "auto" }
-$resolvedEvalDevice = if (-not [string]::IsNullOrWhiteSpace($EvalDevice)) {
-    $EvalDevice
-} elseif ($Cpu) {
-    "cpu"
-} else {
-    "cuda"
-}
 
 $argsList = @(
     $script,
@@ -67,14 +58,13 @@ $argsList = @(
     "--total-timesteps", "$TotalTimesteps",
     "--num-envs", "$NumEnvs",
     "--num-steps", "$NumSteps",
-    "--vector-backend", $VectorBackend,
     "--num-frames", "$NumFrames",
     "--image-size", "$ImageSize",
-    "--obs-source", $ObsSource,
+    "--vector-env", "$VectorEnv",
     "--eval-every", "$EvalEvery",
     "--eval-episodes", "$EvalEpisodes",
-    "--eval-mode", $EvalMode,
-    "--eval-device", $resolvedEvalDevice,
+    "--max-pending-evals", "$MaxPendingEvals",
+    "--eval-vector-env", "$EvalVectorEnv",
     "--save-every", "10",
     "--log-every", "1",
     "--device", $device
@@ -84,6 +74,7 @@ if ($CaptureVideo) { $argsList += "--capture-video" }
 if ($DomainRandomize) { $argsList += "--domain-randomize" }
 if ($FailOnNonFinite) { $argsList += "--fail-on-nonfinite" }
 if ($LrAnneal) { $argsList += "--lr-anneal" }
+if ($NoAsyncEval) { $argsList += "--no-async-eval" }
 if ($ExtraArgs) { $argsList += $ExtraArgs }
 
 Write-Output "Run directory: $saveDir"
@@ -92,19 +83,9 @@ Write-Output "Metrics file: $metricsFile"
 
 Push-Location $root
 try {
-    $previousErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-
-    try {
-        & $python @argsList 2>&1 | Tee-Object -FilePath $logFile
-        if ($LASTEXITCODE -ne 0) {
-            throw "Training process failed with exit code $LASTEXITCODE."
-        }
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
+    & $python @argsList 2>&1 | Tee-Object -FilePath $logFile
 }
 finally {
     Pop-Location
 }
+

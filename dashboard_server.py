@@ -199,7 +199,8 @@ async function loadMetrics() {
 function renderStats(records) {
   const bar = document.getElementById("statsBar");
   if (!records.length) { bar.innerHTML = ""; return; }
-  const last = records[records.length - 1];
+  const trainingRecords = records.filter(r => r.record_type !== "eval_result");
+  const last = trainingRecords[trainingRecords.length - 1] || records[records.length - 1];
   const items = [
     { label: "Update", value: last.update },
     { label: "Global Step", value: last.global_step?.toLocaleString() },
@@ -227,8 +228,8 @@ function renderCharts(records) {
   const container = document.getElementById("chartsContainer");
   container.innerHTML = "";
 
-  // Use global_step as x-axis, fallback to update
-  const xs = records.map(r => r.global_step ?? r.update);
+  const trainingRecords = records.filter(r => r.record_type !== "eval_result");
+  const evalRecords = records.filter(r => r.eval_return_mean != null || r.best_eval_return != null);
   const hasEval = records.some(r => r.eval_return_mean != null);
 
   for (const group of CHART_GROUPS) {
@@ -241,8 +242,10 @@ function renderCharts(records) {
     container.appendChild(header);
 
     for (const spec of group.charts) {
+      const sourceRecords = group.title.includes("璇勪及") ? evalRecords : trainingRecords;
+      const xs = sourceRecords.map(r => r.global_step ?? r.update);
       // Check if any data exists for these keys
-      const hasData = spec.keys.some(k => records.some(r => r[k] != null));
+      const hasData = spec.keys.some(k => sourceRecords.some(r => r[k] != null));
       if (!hasData) continue;
 
       const card = document.createElement("div");
@@ -256,7 +259,7 @@ function renderCharts(records) {
       }));
 
       const datasets = spec.keys.map((key, i) => {
-        const ys = records.map(r => r[key] != null ? r[key] : null);
+        const ys = sourceRecords.map(r => r[key] != null ? r[key] : null);
         return {
           label: key,
           data: ys,

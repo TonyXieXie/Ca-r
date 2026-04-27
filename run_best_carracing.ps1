@@ -3,7 +3,7 @@ param(
     [string]$RunDir = "runs\\carracing_ppo_20260423_153611",
     [string]$Checkpoint = "",
     [int]$Episodes = 3,
-    [int]$Seed = -1,
+    [int]$Seed = 10,
     [int]$Fps = 50,
     [int]$MaxSteps = 0,
     [switch]$Cpu,
