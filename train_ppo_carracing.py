@@ -18,6 +18,7 @@ from gymnasium.vector.vector_env import AutoresetMode
 from torch import Tensor
 from torch.optim import Adam
 
+from carracing_observation import DEFAULT_OBS_SOURCE, make_carracing_env
 from carracing_obs import init_frame_stack, resize_observations, update_frame_stack
 from ppo_pixel_policy import CarRacingPPOPolicy
 
@@ -87,14 +88,22 @@ def choose_device(device_arg: str) -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def make_env(env_id: str, idx: int, seed: int, capture_video: bool, run_dir: Path, domain_randomize: bool):
+def make_env(
+    idx: int,
+    seed: int,
+    capture_video: bool,
+    run_dir: Path,
+    domain_randomize: bool,
+    image_size: int,
+):
     def thunk():
         render_mode = "rgb_array" if capture_video and idx == 0 else None
-        env = gym.make(
-            env_id,
-            continuous=True,
+        env = make_carracing_env(
             domain_randomize=domain_randomize,
             render_mode=render_mode,
+            obs_source=DEFAULT_OBS_SOURCE,
+            image_size=image_size,
+            continuous=True,
         )
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if capture_video and idx == 0:
@@ -217,12 +226,12 @@ def evaluate_policy(
 
     env_fns = [
         make_env(
-            "CarRacing-v3",
             idx=i,
             seed=seed,
             capture_video=False,
             run_dir=Path("."),
             domain_randomize=domain_randomize,
+            image_size=policy.image_size,
         )
         for i in range(eval_episodes)
     ]
@@ -356,12 +365,12 @@ def main() -> None:
 
     env_fns = [
         make_env(
-            "CarRacing-v3",
             idx=i,
             seed=args.seed,
             capture_video=args.capture_video,
             run_dir=args.save_dir,
             domain_randomize=args.domain_randomize,
+            image_size=args.image_size,
         )
         for i in range(args.num_envs)
     ]

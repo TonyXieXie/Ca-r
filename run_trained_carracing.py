@@ -4,10 +4,10 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-import gymnasium as gym
 import numpy as np
 import torch
 
+from carracing_observation import DEFAULT_OBS_SOURCE, make_carracing_env
 from carracing_obs import init_frame_stack, resize_observations, update_frame_stack
 from ppo_pixel_policy import CarRacingPPOPolicy
 
@@ -135,11 +135,12 @@ def main() -> None:
     policy.eval()
 
     render_mode = None if args.render_mode == "none" else args.render_mode
-    env = gym.make(
-        "CarRacing-v3",
-        continuous=True,
+    env = make_carracing_env(
         domain_randomize=domain_randomize,
         render_mode=render_mode,
+        obs_source=DEFAULT_OBS_SOURCE,
+        image_size=image_size,
+        continuous=True,
     )
 
     if render_mode == "human" and args.fps > 0 and hasattr(env, "metadata"):

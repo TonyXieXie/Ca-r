@@ -8,8 +8,10 @@ from PIL import Image
 
 
 DEFAULT_IMAGE_SIZE = 256
-DEFAULT_OBS_SOURCE = "rgb_array"
+DEFAULT_OBS_SOURCE = "state_pixels"
 DEFAULT_MAX_EPISODE_STEPS = 1000
+DEFAULT_OFF_ROAD_PENALTY = 0.1
+DEFAULT_OFF_ROAD_TERMINATION_FRAMES = 50
 
 
 def _resample_bilinear() -> int:
@@ -38,11 +40,36 @@ def resize_frame_to_square(frame: np.ndarray, image_size: int) -> np.ndarray:
 class ConfigurableCarRacing(CarRacing):
     """CarRacing variant that emits either state_pixels or rgb_array as observations."""
 
-    def __init__(self, *args, observation_mode: str = "state_pixels", **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        observation_mode: str = "state_pixels",
+        off_road_penalty: float = DEFAULT_OFF_ROAD_PENALTY,
+        off_road_termination_frames: int = DEFAULT_OFF_ROAD_TERMINATION_FRAMES,
+        **kwargs,
+    ) -> None:
         if observation_mode not in {"state_pixels", "rgb_array"}:
             raise ValueError(f"Unsupported observation_mode={observation_mode!r}")
+        if off_road_penalty < 0:
+            raise ValueError(f"off_road_penalty must be >= 0, got {off_road_penalty!r}")
+        if off_road_termination_frames <= 0:
+            raise ValueError(
+                "off_road_termination_frames must be > 0, "
+                f"got {off_road_termination_frames!r}"
+            )
         self.observation_mode = observation_mode
+        self.off_road_penalty = float(off_road_penalty)
+        self.off_road_termination_frames = int(off_road_termination_frames)
+        self.off_road_frames = 0
         super().__init__(*args, **kwargs)
+
+    def reset(self, **kwargs):
+        self.off_road_frames = 0
+        return super().reset(**kwargs)
+
+    def _has_road_contact(self) -> bool:
+        assert self.car is not None
+        return any(bool(getattr(wheel, "tiles", ())) for wheel in self.car.wheels)
 
     def step(self, action: np.ndarray | int):
         assert self.car is not None
@@ -71,19 +98,32 @@ class ConfigurableCarRacing(CarRacing):
         step_reward = 0.0
         terminated = False
         truncated = False
-        info: dict[str, bool] = {}
+        info: dict[str, bool | int] = {}
         if action is not None:
             self.reward -= 0.1
+            on_road = self._has_road_contact()
+            if on_road:
+                self.off_road_frames = 0
+            else:
+                self.off_road_frames += 1
+                self.reward -= self.off_road_penalty
             self.car.fuel_spent = 0.0
             step_reward = self.reward - self.prev_reward
             self.prev_reward = self.reward
+            info["on_road"] = on_road
+            info["off_road_frames"] = self.off_road_frames
             if self.tile_visited_count == len(self.track) or self.new_lap:
                 terminated = True
                 info["lap_finished"] = True
+            elif self.off_road_frames >= self.off_road_termination_frames:
+                terminated = True
+                info["lap_finished"] = False
+                info["off_road_terminated"] = True
             x, y = self.car.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 terminated = True
                 info["lap_finished"] = False
+                info["out_of_playfield"] = True
                 step_reward = -100.0
 
         if self.render_mode == "human":
@@ -124,12 +164,16 @@ def make_carracing_env(
     image_size: int,
     continuous: bool = True,
     max_episode_steps: int = DEFAULT_MAX_EPISODE_STEPS,
+    off_road_penalty: float = DEFAULT_OFF_ROAD_PENALTY,
+    off_road_termination_frames: int = DEFAULT_OFF_ROAD_TERMINATION_FRAMES,
 ) -> gym.Env:
     env: gym.Env = ConfigurableCarRacing(
         render_mode=render_mode,
         domain_randomize=domain_randomize,
         continuous=continuous,
         observation_mode=obs_source,
+        off_road_penalty=off_road_penalty,
+        off_road_termination_frames=off_road_termination_frames,
     )
     env = gym.wrappers.TimeLimit(env, max_episode_steps=max_episode_steps)
     env = CarRacingObservationWrapper(env, image_size=image_size)
