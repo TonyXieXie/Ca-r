@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-envs", type=int, default=4)
     parser.add_argument("--vector-env", type=str, default="async", choices=["async", "sync"])
     parser.add_argument("--num-steps", type=int, default=128)
-    parser.add_argument("--num-frames", type=int, default=1)
+    parser.add_argument("--num-frames", type=int, default=4)
     parser.add_argument("--image-size", type=int, default=96)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--learning-rate", type=float, default=3e-4)

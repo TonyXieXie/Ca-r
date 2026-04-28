@@ -1309,13 +1309,13 @@
         <div class="eyebrow">Live JSONL Telemetry</div>
         <h1>CarRacing 训练监控面板</h1>
         <p class="subtitle">
-          选择一个 <code>metrics.jsonl</code>，页面会自动解析其中的数值型监督指标并绘制趋势。
-          如果浏览器支持文件句柄，会定时轮询文件变化，适合边训练边看。
+          选择一个 <code>runs/&lt;run&gt;</code> 目录，页面会自动读取其中的 <code>metrics.jsonl</code> 并绘制趋势，
+          同时把回放控制台联动到同一个 run。如果浏览器支持目录句柄，会定时轮询文件变化，适合边训练边看。
         </p>
         <div class="hero-meta">
           <div class="meta-chip"><span class="meta-dot"></span><span>适配 JSONL 追加写入</span></div>
           <div class="meta-chip"><span class="meta-dot"></span><span>自动识别指标字段</span></div>
-          <div class="meta-chip"><span class="meta-dot"></span><span>本地单文件，无后端</span></div>
+          <div class="meta-chip"><span class="meta-dot"></span><span>本地目录句柄，无后端</span></div>
         </div>
       </article>
 
@@ -1323,12 +1323,12 @@
         <p class="control-title">数据源</p>
         <div class="controls">
           <div class="row">
-            <button class="primary" id="pick-handle-btn" type="button">连接文件并自动刷新</button>
+            <button class="primary" id="pick-handle-btn" type="button">连接 run 目录并自动刷新</button>
             <button class="ghost" id="refresh-btn" type="button">立即刷新</button>
           </div>
 
           <div class="row">
-            <input id="file-input" type="file" accept=".jsonl,application/jsonl,text/plain,.txt" />
+            <input id="file-input" type="file" webkitdirectory directory multiple />
           </div>
 
           <div class="row">
@@ -1370,8 +1370,8 @@
           </div>
 
           <p class="hint">
-            推荐用 Edge/Chrome 点击“连接文件并自动刷新”。如果浏览器不支持文件句柄，
-            仍然可以通过普通文件选择读取快照，但训练中追加写入时需要重新选择文件。
+            推荐用 Edge/Chrome 点击“连接 run 目录并自动刷新”，直接选择 <code>runs/&lt;run&gt;</code>。
+            如果浏览器不支持目录句柄，仍然可以通过目录快照模式读取单个 run，但训练中追加写入或新增 checkpoint 后需要重新选择目录。
           </p>
 
           <div class="status-box">
@@ -1380,7 +1380,7 @@
               <span class="status-pill warn" id="refresh-pill">等待数据</span>
               <span class="status-pill" id="rows-pill">0 行</span>
             </div>
-            <div><code id="file-path">尚未选择文件</code></div>
+            <div><code id="file-path">尚未选择 run 目录</code></div>
             <div class="status-line">
               <span id="last-read-label">最后读取: -</span>
               <span id="file-size-label">大小: -</span>
@@ -1572,11 +1572,11 @@
     </section>
 
     <section id="empty-state" class="empty-state">
-      <h3>先载入一个 metrics.jsonl</h3>
+      <h3>先连接一个 run 目录</h3>
       <p>
         当前页面还没有拿到训练日志。你可以直接选择
-        <code>E:\AI\Car\runs\...\metrics.jsonl</code>，
-        页面会按字段自动生成图表，并在可用时持续刷新。
+        <code>E:\AI\Car\runs\your_run</code>，
+        页面会自动读取里面的 <code>metrics.jsonl</code>，并把回放控制台联动到同一个 run。
       </p>
     </section>
 
@@ -1672,9 +1672,11 @@
 
     const state = {
       rows: [],
-      fileHandle: null,
-      snapshotFile: null,
-      fileLabel: "",
+      runHandle: null,
+      runSnapshotFiles: [],
+      runName: "",
+      metricsFileName: "metrics.jsonl",
+      connectionMode: "",
       lastRead: null,
       lastSize: 0,
       lastModified: 0,
@@ -1692,6 +1694,7 @@
         drag: null,
       },
       playback: {
+        mode: "",
         runsHandle: null,
         runsSnapshotFiles: [],
         rootLabel: "",
@@ -2827,18 +2830,26 @@
     }
 
     function renderStatus() {
-      elements.modePill.textContent = state.fileHandle ? "文件句柄模式" : state.snapshotFile ? "快照模式" : "未连接";
-      elements.modePill.className = `status-pill ${state.fileHandle ? "ok" : state.snapshotFile ? "warn" : ""}`.trim();
+      const linkedByHandle = state.connectionMode === "linked-run-handle";
+      const linkedBySnapshot = state.connectionMode === "linked-run-snapshot";
+      elements.modePill.textContent = linkedByHandle ? "Run 目录句柄" : linkedBySnapshot ? "Run 快照模式" : "未连接";
+      elements.modePill.className = `status-pill ${linkedByHandle ? "ok" : linkedBySnapshot ? "warn" : ""}`.trim();
 
       const refreshLabel = state.autoRefresh ? `自动刷新 ${state.intervalMs / 1000}s` : "自动刷新已关闭";
       elements.refreshPill.textContent = refreshLabel;
       elements.refreshPill.className = `status-pill ${state.autoRefresh ? "ok" : "warn"}`;
 
       elements.rowsPill.textContent = `${formatInteger(state.rows.length)} 行`;
-      elements.filePath.textContent = state.fileLabel || "尚未选择文件";
+      elements.filePath.textContent = state.runName
+        ? `.\\runs\\${state.runName}\\${state.metricsFileName}${linkedBySnapshot ? " (快照模式)" : ""}`
+        : "尚未选择 run 目录";
       elements.lastReadLabel.textContent = `最后读取: ${formatDate(state.lastRead)}`;
       elements.fileSizeLabel.textContent = `大小: ${formatBytes(state.lastSize)}`;
-      elements.warningLabel.textContent = `警告: ${state.warnings.length ? state.warnings.join("；") : "-"}`;
+      const warningParts = [...state.warnings];
+      if (linkedBySnapshot) {
+        warningParts.unshift("当前为 run 目录快照模式，训练继续写入或新增 checkpoint 后需要重新选择该目录");
+      }
+      elements.warningLabel.textContent = `警告: ${warningParts.length ? warningParts.join("；") : "-"}`;
     }
 
     function renderSummary(rows) {
@@ -2883,6 +2894,16 @@
       };
     }
 
+    function cloneRunRecord(run) {
+      return {
+        name: run.name,
+        hasMetrics: Boolean(run.hasMetrics),
+        hasConfig: Boolean(run.hasConfig),
+        hasBest: Boolean(run.hasBest),
+        checkpoints: [...run.checkpoints],
+      };
+    }
+
     function finalizeRuns(runsMap) {
       return Array.from(runsMap.values())
         .map((run) => {
@@ -2899,12 +2920,21 @@
       if (/^checkpoint_\d+\.pt$/.test(fileName)) run.checkpoints.push(fileName);
     }
 
+    function snapshotPathParts(file) {
+      return (file.webkitRelativePath || file.name).replaceAll("\\", "/").split("/").filter(Boolean);
+    }
+
+    function defaultCheckpointValue(run) {
+      if (!run) return "";
+      if (run.hasBest) return "best";
+      return run.checkpoints[0] || "";
+    }
+
     function buildRunsFromSnapshotFiles(files) {
       const runsMap = new Map();
 
       Array.from(files).forEach((file) => {
-        const relative = (file.webkitRelativePath || file.name).replaceAll("\\", "/");
-        const parts = relative.split("/").filter(Boolean);
+        const parts = snapshotPathParts(file);
         if (parts.length < 2) return;
 
         let runName = parts[0];
@@ -2920,6 +2950,31 @@
       });
 
       return finalizeRuns(runsMap);
+    }
+
+    function buildSingleRunFromSnapshotFiles(files) {
+      const runs = buildRunsFromSnapshotFiles(files);
+      if (!runs.length) {
+        throw new Error("所选目录里没有发现 run 文件");
+      }
+      if (runs.length > 1) {
+        throw new Error("请选择单个 run 目录，不要选择整个 runs 根目录");
+      }
+
+      const run = cloneRunRecord(runs[0]);
+      const metricsFile = Array.from(files).find((file) => {
+        const parts = snapshotPathParts(file);
+        if (!parts.length) return false;
+        if (parts[0].toLowerCase() === "runs") {
+          return parts.length === 3 && parts[1] === run.name && parts[2] === "metrics.jsonl";
+        }
+        return parts.length === 2 && parts[0] === run.name && parts[1] === "metrics.jsonl";
+      }) || null;
+
+      return {
+        run,
+        metricsFile,
+      };
     }
 
     async function scanRunsFromHandle(directoryHandle) {
@@ -2938,6 +2993,56 @@
       }
 
       return finalizeRuns(runsMap);
+    }
+
+    async function scanSingleRunFromHandle(directoryHandle) {
+      const run = normalizeRunRecord(directoryHandle.name);
+      let hasChildDirectories = false;
+
+      for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+        if (entryHandle.kind === "directory") {
+          hasChildDirectories = true;
+          continue;
+        }
+        collectRunFile(run, entryName);
+      }
+
+      return {
+        run,
+        hasChildDirectories,
+      };
+    }
+
+    function syncPlaybackToLinkedRun(run, mode) {
+      const linkedRun = cloneRunRecord(run);
+      state.playback.mode = mode;
+      state.playback.runsHandle = null;
+      state.playback.runsSnapshotFiles = [];
+      state.playback.rootLabel = `.\\runs\\${linkedRun.name}${mode === "linked-run-snapshot" ? " (快照模式)" : ""}`;
+      state.playback.runs = [linkedRun];
+      state.playback.selectedRun = linkedRun.name;
+      state.playback.selectedCheckpoint = defaultCheckpointValue(linkedRun);
+    }
+
+    function applyRunConnection({ run, mode, runHandle = null, runSnapshotFiles = [] }) {
+      state.runHandle = runHandle;
+      state.runSnapshotFiles = runSnapshotFiles;
+      state.runName = run.name;
+      state.metricsFileName = "metrics.jsonl";
+      state.connectionMode = mode;
+      state.warnings = [];
+      syncPlaybackToLinkedRun(run, mode);
+    }
+
+    function activateRunsRootPlayback({ runs, mode, rootLabel }) {
+      state.playback.mode = mode;
+      state.playback.rootLabel = rootLabel;
+      state.playback.runs = runs.map(cloneRunRecord);
+
+      if (!state.playback.runs.some((run) => run.name === state.playback.selectedRun)) {
+        state.playback.selectedRun = state.playback.runs[0]?.name || "";
+        state.playback.selectedCheckpoint = defaultCheckpointValue(state.playback.runs[0] || null);
+      }
     }
 
     function getSelectedRun() {
@@ -2984,10 +3089,13 @@
       const runs = state.playback.runs;
       const run = getSelectedRun();
       const checkpointCount = selectedCheckpointCount(run);
+      const linkedMode = state.playback.mode === "linked-run-handle" || state.playback.mode === "linked-run-snapshot";
+      const runsRootMode = state.playback.mode === "runs-root-handle" || state.playback.mode === "runs-root-snapshot";
+      const snapshotMode = state.playback.mode === "linked-run-snapshot" || state.playback.mode === "runs-root-snapshot";
 
       elements.runSelect.innerHTML = runs.length
         ? runs.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("")
-        : `<option value="">先连接 runs 目录</option>`;
+        : `<option value="">${linkedMode ? "当前连接的 run 暂不可用" : "先连接 run 目录"}</option>`;
 
       if (runs.length && (!state.playback.selectedRun || !runs.some((item) => item.name === state.playback.selectedRun))) {
         state.playback.selectedRun = runs[0].name;
@@ -3023,11 +3131,26 @@
       elements.playbackRootLabel.textContent = `根目录: ${state.playback.rootLabel || "未连接"}`;
 
       if (!selected) {
-        elements.playbackStatus.innerHTML = `先连接项目里的 <code>runs</code> 目录。页面会扫描每个 run 下的 <code>best_model.pt</code> 和 <code>checkpoint_*.pt</code>。`;
-      } else if (!state.playback.runsHandle && state.playback.runsSnapshotFiles.length) {
-        elements.playbackStatus.innerHTML = `当前 run: <code>${escapeHtml(selected.name)}</code>。你现在是目录快照模式；如果训练过程中新增了 checkpoint，需要重新选择 <code>runs</code> 目录。`;
+        if (runsRootMode) {
+          elements.playbackStatus.innerHTML = state.runName
+            ? `回放控制台已切换到手动 runs 浏览模式，但当前目录里没有可用 run。顶部 metrics 仍跟随 <code>${escapeHtml(state.runName)}</code>。`
+            : `回放控制台已切换到手动 runs 浏览模式，但当前目录里没有可用 run。`;
+        } else {
+          elements.playbackStatus.innerHTML = `先在顶部连接一个 <code>runs/&lt;run&gt;</code> 目录，页面会自动把 metrics 和回放控制台联动到同一个 run。`;
+        }
+      } else if (!checkpointOptions.length) {
+        if (runsRootMode) {
+          elements.playbackStatus.innerHTML = `回放控制台当前选择 <code>${escapeHtml(selected.name)}</code>，但这个 run 暂无 <code>best_model.pt</code> 或 <code>checkpoint_*.pt</code>。顶部 metrics ${state.runName ? `仍跟随 <code>${escapeHtml(state.runName)}</code>` : "未连接"}。`;
+        } else {
+          elements.playbackStatus.innerHTML = `当前 run: <code>${escapeHtml(selected.name)}</code>。metrics 已连接，但这个 run 暂无 <code>best_model.pt</code> 或 <code>checkpoint_*.pt</code> 可回放。`;
+        }
+      } else if (runsRootMode) {
+        const connectedLabel = state.runName ? `<code>${escapeHtml(state.runName)}</code>` : "未连接";
+        elements.playbackStatus.innerHTML = `回放控制台已切换到手动 runs 浏览模式。当前选择 <code>${escapeHtml(selected.name)}</code>；顶部 metrics 仍跟随 ${connectedLabel}。${snapshotMode ? "你现在是目录快照模式；如果训练过程中新增了 checkpoint，需要重新选择 runs 目录。" : "你可以在这里浏览其他 run 的回放命令。"} `;
+      } else if (snapshotMode) {
+        elements.playbackStatus.innerHTML = `当前 run: <code>${escapeHtml(selected.name)}</code>。已由顶部数据源自动联动到回放控制台。你现在是目录快照模式；如果训练继续写入或新增 checkpoint，需要重新选择该 run 目录。`;
       } else {
-        elements.playbackStatus.innerHTML = `当前 run: <code>${escapeHtml(selected.name)}</code>。默认优先使用 <code>best_model.pt</code>，也可以切到任意 checkpoint。`;
+        elements.playbackStatus.innerHTML = `当前 run: <code>${escapeHtml(selected.name)}</code>。已由顶部数据源自动联动到回放控制台，默认优先使用 <code>best_model.pt</code>，也可以切到任意 checkpoint。`;
       }
 
       elements.playbackCommand.textContent = buildPlaybackCommand();
@@ -3055,6 +3178,25 @@
       renderPlayback();
     }
 
+    async function loadMetricsFromRunHandle(force = false) {
+      if (!state.runHandle) return;
+      const metricsHandle = await state.runHandle.getFileHandle(state.metricsFileName);
+      const file = await metricsHandle.getFile();
+      if (!force && file.lastModified === state.lastModified && file.size === state.lastSize) return;
+      const text = await file.text();
+      applyLoadedText(text, file.size, file.lastModified);
+    }
+
+    async function loadMetricsFromRunSnapshot() {
+      if (!state.runSnapshotFiles.length) return;
+      const { metricsFile } = buildSingleRunFromSnapshotFiles(state.runSnapshotFiles);
+      if (!metricsFile) {
+        throw new Error("所选 run 目录缺少 metrics.jsonl");
+      }
+      const text = await metricsFile.text();
+      applyLoadedText(text, metricsFile.size, metricsFile.lastModified);
+    }
+
     async function pickRunsDirectory() {
       if (!window.showDirectoryPicker) {
         state.warnings = ["当前浏览器不支持目录句柄，请改用右侧目录选择"];
@@ -3064,12 +3206,14 @@
 
       try {
         const handle = await window.showDirectoryPicker({ mode: "read" });
+        const runs = await scanRunsFromHandle(handle);
         state.playback.runsHandle = handle;
         state.playback.runsSnapshotFiles = [];
-        state.playback.rootLabel = handle.name;
-        state.playback.runs = await scanRunsFromHandle(handle);
-        state.playback.selectedRun = state.playback.runs[0]?.name || "";
-        state.playback.selectedCheckpoint = "best";
+        activateRunsRootPlayback({
+          runs,
+          mode: "runs-root-handle",
+          rootLabel: handle.name,
+        });
         renderPlayback();
       } catch (error) {
         if (error && error.name === "AbortError") return;
@@ -3081,59 +3225,60 @@
     function onRunsDirectorySnapshotSelected(event) {
       const files = event.target.files;
       if (!files || !files.length) return;
-      state.playback.runsHandle = null;
-      state.playback.runsSnapshotFiles = Array.from(files);
-      const firstRelative = state.playback.runsSnapshotFiles[0].webkitRelativePath || "";
+      const snapshotFiles = Array.from(files);
+      const firstRelative = snapshotFiles[0].webkitRelativePath || "";
       const rootName = firstRelative.replaceAll("\\", "/").split("/").filter(Boolean)[0] || "runs";
-      state.playback.rootLabel = `${rootName} (快照模式)`;
-      state.playback.runs = buildRunsFromSnapshotFiles(files);
-      state.playback.selectedRun = state.playback.runs[0]?.name || "";
-      state.playback.selectedCheckpoint = "best";
+      state.playback.runsHandle = null;
+      state.playback.runsSnapshotFiles = snapshotFiles;
+      activateRunsRootPlayback({
+        runs: buildRunsFromSnapshotFiles(snapshotFiles),
+        mode: "runs-root-snapshot",
+        rootLabel: `${rootName} (快照模式)`,
+      });
       renderPlayback();
     }
 
     async function refreshRunsList() {
-      if (state.playback.runsHandle) {
-        state.playback.runs = await scanRunsFromHandle(state.playback.runsHandle);
-        if (!state.playback.runs.some((run) => run.name === state.playback.selectedRun)) {
-          state.playback.selectedRun = state.playback.runs[0]?.name || "";
-          state.playback.selectedCheckpoint = "best";
-        }
+      if (state.playback.mode === "runs-root-handle" && state.playback.runsHandle) {
+        activateRunsRootPlayback({
+          runs: await scanRunsFromHandle(state.playback.runsHandle),
+          mode: "runs-root-handle",
+          rootLabel: state.playback.runsHandle.name,
+        });
         renderPlayback();
         return;
       }
 
-      if (state.playback.runsSnapshotFiles.length) {
-        state.playback.runs = buildRunsFromSnapshotFiles(state.playback.runsSnapshotFiles);
-        if (!state.playback.runs.some((run) => run.name === state.playback.selectedRun)) {
-          state.playback.selectedRun = state.playback.runs[0]?.name || "";
-          state.playback.selectedCheckpoint = "best";
-        }
+      if (state.playback.mode === "runs-root-snapshot" && state.playback.runsSnapshotFiles.length) {
+        activateRunsRootPlayback({
+          runs: buildRunsFromSnapshotFiles(state.playback.runsSnapshotFiles),
+          mode: "runs-root-snapshot",
+          rootLabel: state.playback.rootLabel || "runs (快照模式)",
+        });
         renderPlayback();
         return;
       }
 
-      elements.playbackStatus.innerHTML = `还没有连接 <code>runs</code> 目录，无法刷新列表。`;
+      if (state.connectionMode === "linked-run-handle" && state.runHandle) {
+        const { run } = await scanSingleRunFromHandle(state.runHandle);
+        syncPlaybackToLinkedRun(run, "linked-run-handle");
+        renderPlayback();
+        return;
+      }
+
+      if (state.connectionMode === "linked-run-snapshot" && state.runSnapshotFiles.length) {
+        const { run } = buildSingleRunFromSnapshotFiles(state.runSnapshotFiles);
+        syncPlaybackToLinkedRun(run, "linked-run-snapshot");
+        renderPlayback();
+        return;
+      }
+
+      elements.playbackStatus.innerHTML = `还没有连接 run 目录，无法刷新回放列表。`;
     }
 
-    async function loadFromHandle(force = false) {
-      if (!state.fileHandle) return;
-      const file = await state.fileHandle.getFile();
-      if (!force && file.lastModified === state.lastModified && file.size === state.lastSize) return;
-      const text = await file.text();
-      applyLoadedText(text, file.name, file.size, file.lastModified);
-    }
-
-    async function loadFromSnapshot() {
-      if (!state.snapshotFile) return;
-      const text = await state.snapshotFile.text();
-      applyLoadedText(text, state.snapshotFile.name, state.snapshotFile.size, state.snapshotFile.lastModified);
-    }
-
-    function applyLoadedText(text, fileName, size, lastModified) {
+    function applyLoadedText(text, size, lastModified) {
       const { rows, warnings } = parseJsonl(text);
       state.rows = rows;
-      state.fileLabel = fileName;
       state.lastSize = size;
       state.lastModified = lastModified || 0;
       state.lastRead = new Date();
@@ -3143,10 +3288,10 @@
 
     async function refreshNow(force = false) {
       try {
-        if (state.fileHandle) {
-          await loadFromHandle(force);
-        } else if (state.snapshotFile) {
-          await loadFromSnapshot();
+        if (state.runHandle) {
+          await loadMetricsFromRunHandle(force);
+        } else if (state.runSnapshotFiles.length) {
+          await loadMetricsFromRunSnapshot();
         }
       } catch (error) {
         state.warnings = [`读取失败: ${error.message}`];
@@ -3165,47 +3310,56 @@
       }, state.intervalMs);
     }
 
-    async function pickFileHandle() {
-      if (!window.showOpenFilePicker) {
-        state.warnings = ["当前浏览器不支持文件句柄，请改用下面的文件选择"];
+    async function pickRunDirectory() {
+      if (!window.showDirectoryPicker) {
+        state.warnings = ["当前浏览器不支持目录句柄，请改用下面的目录选择"];
         renderStatus();
         return;
       }
 
       try {
-        const [handle] = await window.showOpenFilePicker({
-          multiple: false,
-          types: [
-            {
-              description: "JSONL metrics",
-              accept: {
-                "application/json": [".jsonl", ".json", ".txt"],
-                "text/plain": [".jsonl", ".txt"],
-              },
-            },
-          ],
-        });
+        const handle = await window.showDirectoryPicker({ mode: "read" });
+        const { run, hasChildDirectories } = await scanSingleRunFromHandle(handle);
+        if (!run.hasMetrics) {
+          throw new Error(hasChildDirectories ? "请选择单个 run 目录，不要选择整个 runs 根目录" : "所选目录缺少 metrics.jsonl");
+        }
 
-        state.fileHandle = handle;
-        state.snapshotFile = null;
-        state.fileLabel = handle.name;
-        state.warnings = [];
+        applyRunConnection({
+          run,
+          mode: "linked-run-handle",
+          runHandle: handle,
+          runSnapshotFiles: [],
+        });
         await refreshNow(true);
       } catch (error) {
         if (error && error.name === "AbortError") return;
-        state.warnings = [`选择文件失败: ${error.message}`];
+        state.warnings = [`选择 run 目录失败: ${error.message}`];
         renderStatus();
       }
     }
 
-    function onSnapshotSelected(event) {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
-      state.snapshotFile = file;
-      state.fileHandle = null;
-      state.fileLabel = file.name;
-      state.warnings = ["当前为快照模式，训练继续写入后需要重新选择文件"];
-      refreshNow(true);
+    function onRunSnapshotSelected(event) {
+      const files = event.target.files;
+      if (!files || !files.length) return;
+
+      try {
+        const snapshotFiles = Array.from(files);
+        const { run, metricsFile } = buildSingleRunFromSnapshotFiles(snapshotFiles);
+        if (!metricsFile || !run.hasMetrics) {
+          throw new Error("所选 run 目录缺少 metrics.jsonl");
+        }
+
+        applyRunConnection({
+          run,
+          mode: "linked-run-snapshot",
+          runHandle: null,
+          runSnapshotFiles: snapshotFiles,
+        });
+        refreshNow(true);
+      } catch (error) {
+        state.warnings = [`选择 run 目录失败: ${error.message}`];
+        renderStatus();
+      }
     }
 
     function bindEvents() {
@@ -3226,9 +3380,9 @@
         closeAllCustomSelects();
       });
 
-      elements.pickHandleBtn.addEventListener("click", pickFileHandle);
+      elements.pickHandleBtn.addEventListener("click", pickRunDirectory);
       elements.refreshBtn.addEventListener("click", () => refreshNow(true));
-      elements.fileInput.addEventListener("change", onSnapshotSelected);
+      elements.fileInput.addEventListener("change", onRunSnapshotSelected);
       elements.pickRunsDirBtn.addEventListener("click", pickRunsDirectory);
       elements.refreshRunsBtn.addEventListener("click", () => {
         refreshRunsList();

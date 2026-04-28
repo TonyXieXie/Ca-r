@@ -4,7 +4,7 @@ param(
     [int]$TotalTimesteps = 1000000,
     [int]$NumEnvs = 4,
     [int]$NumSteps = 128,
-    [int]$NumFrames = 1,
+    [int]$NumFrames = 4,
     [int]$ImageSize = 96,
     [ValidateSet("async", "sync")]
     [string]$VectorEnv = "async",

@@ -1,6 +1,6 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
-    [string]$RunDir = "runs\\carracing_ppo_20260423_153611",
+    [string]$RunDir = "runs\\codex_train_20260428_092849",
     [string]$Checkpoint = "",
     [int]$Episodes = 3,
     [int]$Seed = 10,
